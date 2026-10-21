@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
+    "smoke": "node tools/smoke.mjs",
     "balance": "node tools/balance.js",
     "balance:prompts": "node tools/balance.js prompts",
     "balance:mirror": "node tools/balance.js mirror",
@@ -19,5 +20,8 @@
   },
   "engines": {
     "node": ">=20.12"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0"
   }
 }

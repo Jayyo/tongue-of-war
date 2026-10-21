@@ -269,7 +269,8 @@ function send(res, code, obj) {
 }
 
 server.listen(PORT, HOST, () => {
-  console.log(`Tongue of War  ->  http://${HOST.includes(':') ? `[${HOST}]` : HOST}:${PORT}`);
+  const { port } = /** @type {import('node:net').AddressInfo} */ (server.address());
+  console.log(`Tongue of War  ->  http://${HOST.includes(':') ? `[${HOST}]` : HOST}:${port}`);
   console.log(provider
     ? `opponent: ${provider.id} / ${provider.model}${provider.effort ? ` (reasoning ${provider.effort})` : ''}`
     : 'opponent: scripted bot (no LLM key configured, see .env.example)');
