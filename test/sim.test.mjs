@@ -44,22 +44,23 @@ function mirror(text, seed) {
     B.players[side].essence = 9999;
     queueContract(B, side, compile(stubInterpret(text, NEUTRAL), 120, NEUTRAL), 0);
   }
-  const value = (side) => B.units.filter((u) => u.side === side && u.hp > 0).reduce((s, u) => s + u.hp, 0);
+  const alive = (side) => B.units.some((u) => u.side === side && u.hp > 0);
   for (let i = 0; i < 20 * 60; i++) {
     step(B, DT);
-    if (B.wave >= 1 && (!value(SIDE.L) || !value(SIDE.R))) break;
+    if (B.wave >= 1 && (!alive(SIDE.L) || !alive(SIDE.R))) break;
   }
-  return [value(SIDE.L), value(SIDE.R)];
+  return { left: alive(SIDE.L), right: alive(SIDE.R), t: B.t };
 }
 
-test('mirror matches end exactly even (no processing-order bias)', () => {
+test('identical cohorts wipe each other out on the same tick', () => {
   // The first engine updated units in array order and the left side won 12/12
   // mirror matches. Planning against frozen state and applying damage together
-  // fixed it; this keeps it fixed.
-  for (const text of ['두꺼운 갑옷을 두른 방패 수문장 셋', '은폐한 채 접근하는 독칼 암살자 셋', '광역으로 휩쓰는 화염 폭발 술사', '돌진하는 흉포한 야수 무리 다섯']) {
+  // fixed it; this keeps it fixed. These designs always meet and fight it out
+  // inside a minute (tanky or veiled ones can time out instead).
+  for (const text of ['적 후열 포격수를 파고드는 날렵한 그림자 자객 셋', '광역으로 휩쓰는 화염 폭발 술사', '돌진하는 흉포한 야수 무리 다섯', '정밀하게 꿰뚫는 강철 장궁대']) {
     for (const seed of [2000, 2613, 3226]) {
-      const [l, r] = mirror(text, seed);
-      assert.equal(l, r, `${text} seed ${seed}: left ${l} vs right ${r}`);
+      const r = mirror(text, seed);
+      assert.ok(!r.left && !r.right && r.t < 60, `${text} seed ${seed}: left ${r.left} right ${r.right} at ${r.t.toFixed(2)}s`);
     }
   }
 });

@@ -6,9 +6,10 @@ import { interpretVisual } from '../src/gen/visual.js';
 import { compile } from '../src/domain/budget.js';
 
 const NEUTRAL = { id: 'neutral', faction: 'demon', name: 'neutral', bias: {}, mechanic: { id: 'none' } };
+/** The whole blueprint except its display name and the parser's confidence score. */
 const stats = (text) => {
-  const bp = compile(stubInterpret(text, NEUTRAL), 120, NEUTRAL);
-  return ['role', 'count', 'totalHp', 'totalDps', 'range', 'speed', 'channel', 'resistPhysical', 'resistArcane'].map((k) => bp[k]);
+  const { name, confidence, ...rest } = compile(stubInterpret(text, NEUTRAL), 120, NEUTRAL);
+  return rest;
 };
 
 test('appearance-only words do not change a single stat', () => {

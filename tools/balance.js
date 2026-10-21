@@ -138,8 +138,10 @@ function cohortDuel(aPrompt, bPrompt, seed, swapSides = false, opts = {}) {
       };
     }
   }
+  const value = (side) => B.units.filter((u) => u.side === side && u.hp > 0).reduce((s, u) => s + u.hp + u.dps * 5, 0);
   return {
-    winner: 'timeout', remainFrac: 0, fight: 0, overkillFrac: 0, crossLane: 0,
+    winner: 'timeout', even: value(aSide) === value(other(aSide)),
+    remainFrac: 0, fight: 0, overkillFrac: 0, crossLane: 0,
     firstAttackGap: null, aArrivalSpread: 0, bArrivalSpread: 0,
     firstEngagement: null,
     aFirstAttackTimes: [], bFirstAttackTimes: [],
@@ -240,32 +242,35 @@ function reportCompile() {
 
 /** ORDER FAIRNESS: the same cohort on both sides must not favour a side. */
 function reportMirror() {
-  console.log('\n=== Order fairness: the same cohort on both sides (left win rate, target 45-55%) ===');
-  let worst = 0;
+  console.log('\n=== Order fairness: the same cohort on both sides (left win rate of decided games, target 45-55%) ===');
+  let worst = 0, uneven = 0;
   for (const r of REFERENCE) {
-    let lw = 0, draws = 0;
+    let lw = 0, wipes = 0, timeouts = 0;
     const N = 12;
     for (let s = 0; s < N; s++) {
       const out = cohortDuel(r.text, r.text, 2000 + s * 613);
       if (out.winner === 'A') lw++;
-      else if (out.winner === 'draw' || out.winner === 'timeout') draws++;
+      else if (out.winner === 'draw') wipes++;
+      else if (out.winner === 'timeout') { timeouts++; if (!out.even) uneven++; }
     }
-    // Simultaneous wipes are PROOF of symmetry, not evidence of bias — they must
-    // not count toward the left-side win rate.
-    const decided = N - draws;
+    // Simultaneous wipes, and timeouts with both sides at equal value, are what a
+    // fair engine produces here; they must not count toward the left-side win rate.
+    const decided = N - wipes - timeouts;
+    const tail = `simultaneous wipes ${wipes}, timeouts ${timeouts}`;
     if (decided === 0) {
-      console.log(`  ${r.key.padEnd(9)} perfectly even (${N}/${N} simultaneous wipes)`);
+      console.log(`  ${r.key.padEnd(9)} no winner in ${N}/${N} (${tail})`);
       continue;
     }
     const rate = Math.round((lw / decided) * 100);
     worst = Math.max(worst, Math.abs(rate - 50));
-    console.log(`  ${r.key.padEnd(9)} left ${String(rate).padStart(3)}%  (decided ${decided}/${N}, simultaneous wipes ${draws})`);
+    console.log(`  ${r.key.padEnd(9)} left ${String(rate).padStart(3)}%  (decided ${decided}/${N}, ${tail})`);
   }
-  console.log(`  -> max bias ${worst} pp ${worst <= 20 ? '(pass)' : '(FAIL: processing-order bias)'}`);
+  const pass = worst <= 5 && uneven === 0;
+  console.log(`  -> max bias ${worst} pp${uneven ? `, ${uneven} uneven timeouts` : ''} ${pass ? '(pass)' : '(FAIL: processing-order bias)'}`);
 }
 
 function reportTriangle() {
-  console.log('\n=== Matchup matrix (120 BP, 6 games per pair with sides swapped; % of games the row won) ===');
+  console.log('\n=== Matchup matrix (120 BP, 6 games per pair with sides swapped; % of games the row won, draws count as not won) ===');
   const keys = REFERENCE.map((r) => r.key);
   console.log('           ' + keys.map((k) => k.slice(0, 5).padStart(6)).join(''));
   let asymWorst = 0;
