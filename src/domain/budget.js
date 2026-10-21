@@ -248,8 +248,17 @@ export function compile(rawIntent, bp, commander) {
     const slack = bp - fixedTotal();
     if (slack > 0.5) {
       const hpRoom = Math.max(0, Math.min(C.share.hpMax, roleCfg.hpShareMax ?? 1) * bp - cHp);
-      const toHp = Math.min(slack, hpRoom);
-      cHp += toHp;
+      // Extra HP also enlarges the pool the resist is priced against, so the
+      // defense cost has to grow with it. Adding the raw slack let a resistant
+      // unit take its resist on the new HP for free.
+      const defFor = (hp) => costOf.defense(hp + wardRawBp(hp, skills), rp, rm);
+      let lo = 0, hi = Math.min(slack, hpRoom);
+      for (let i = 0; i < 24; i++) {
+        const add = (lo + hi) / 2;
+        if (fixedTotal() - cDef + defFor(cHp + add) + add <= bp) lo = add; else hi = add;
+      }
+      cHp += lo;
+      cDef = defFor(cHp);
       const dpsRoom = Math.max(0, C.share.dpsMax * bp - cDps);
       if (dpsRoom > 0 && fixedTotal() < bp) {
         // DPS also raises the range/speed synergy surcharge. Adding the raw slack

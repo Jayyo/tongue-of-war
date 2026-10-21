@@ -4,7 +4,7 @@
 // prints a reproducible input.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compile } from '../src/domain/budget.js';
+import { compile, costOf } from '../src/domain/budget.js';
 import { stubInterpret } from '../src/gen/interpreter.js';
 import { COMMANDERS } from '../src/domain/commanders.js';
 import { SKILLS } from '../src/domain/skills.js';
@@ -17,6 +17,22 @@ const NEUTRAL = { id: 'neutral', faction: 'demon', name: 'neutral', bias: {}, me
 const COMMANDER_POOL = [NEUTRAL, ...COMMANDERS];
 const BUDGETS = Object.values(CFG.ritual.tiers).map((t) => t.bp);
 
+/**
+ * Price the finished unit from its final stats with the documented cost formulas,
+ * instead of trusting the compiler's own breakdown.
+ */
+function priceOf(bp) {
+  const cHp = bp.totalHp / C.hpPerBp;
+  const cDps = bp.totalDps / C.dpsPerBp;
+  const ward = bp.skills.includes('ward') ? cHp * SKILLS.ward.params.shieldFrac * C.wardProcsRef : 0;
+  const cRange = costOf.range(bp.range);
+  const cSpeed = costOf.speed(bp.speed);
+  const v = Math.max(0, cSpeed);
+  return cHp + cDps + costOf.defense(cHp + ward, bp.resistPhysical, bp.resistArcane) + cRange + cSpeed
+    + bp.skills.reduce((s, k) => s + SKILLS[k].bp, 0) + (C.splitCost[bp.count] ?? 0)
+    + (C.formationBp[bp.formation] ?? 0) + 0.01 * cDps * (cRange + v) + 0.02 * cRange * v;
+}
+
 /** Bounds that follow from config alone, not from the compiler's own cost math. */
 function violations(bp, budget, cmd) {
   const out = [];
@@ -25,7 +41,9 @@ function violations(bp, budget, cmd) {
     if (!Number.isFinite(bp[k])) out.push(`${k} is not finite`);
   }
   if (!role) return [...out, `unknown role ${bp.role}`];
-  if (!(bp.breakdown.total <= budget + 0.05)) out.push(`spent ${bp.breakdown.total} of ${budget}`);
+  if (!(bp.breakdown.total <= budget + 0.05)) out.push(`reported ${bp.breakdown.total} of ${budget}`);
+  const price = priceOf(bp);
+  if (!(price <= budget + 0.05)) out.push(`priced at ${price.toFixed(2)} of ${budget}`);
   if (!C.limits.counts.includes(bp.count)) out.push(`count ${bp.count}`);
   if (cmd.countMax && bp.count > cmd.countMax) out.push(`count ${bp.count} over commander cap`);
   const rangeMax = Math.min(C.limits.rangeMax, role.rangeMax ?? Infinity, cmd.rangeMax ?? Infinity);
