@@ -13,9 +13,10 @@ sentence, which goes through the same parser. Recorded headlessly with
 
 ## The idea
 
-Letting players type what they want is the easy part. The hard part is that once a
-language model can output numbers, there is no balance left: someone will ask for an
-invincible dragon. So nothing anyone writes, player or model, becomes a number directly.
+Letting players type what they want is the easy part. Keeping that from breaking the
+game is the hard part: if a model's output can set stats, someone will ask for an
+invincible dragon and get one. So nothing anyone writes, player or model, becomes a number
+directly. The words pick a description; the compiler decides the stats.
 
 ```
 sentence ─┬─> parser ─────────> UnitIntent ──> BP compiler ──> unit stats
@@ -36,10 +37,12 @@ sentence a good one. It guarantees that whatever is written becomes a legal unit
 its budget. `npm test` fuzzes the compiler with thousands of random sentences and
 malformed intents to keep that true; it found two holes while it was being written.
 
-The opponent plays by the same rules. The browser sends the server a public battlefield
-snapshot, the server builds the prompt, the model writes one Korean sentence, and the
-client runs it through the same parser and compiler as yours. The model picks tactics,
-never stats.
+The LLM opponent plays by the same rules. The browser sends the server a public
+battlefield snapshot, the server builds the prompt, the model writes one Korean sentence,
+and the client prices it exactly like yours: same parser, same compiler, same context
+discount and repeat surcharge. The model picks tactics, never stats. Without a key, a
+scripted bot picks sentences from a fixed book and sends them through the same parser and
+compiler at list price.
 
 ## Run it
 
@@ -75,7 +78,9 @@ game's real prompt gpt-6-luna answered in 1.3 to 2.3 s, while larger reasoning m
 ## How to play
 
 The input is Korean, but you do not need much of it: the suggestions above the box can be
-clicked, and the receipt tells you what each word did.
+clicked, and the receipt tells you what each word did. A few HUD words: 영기 essence,
+소환 summon, 각인 engrave, 연성 transmute, 전황 signals, 추천 suggestions, 국면 phase
+(a 12 s wave); the roles are 수호자 guard, 습격자 raider and 포격수 artillery.
 
 ![Commander select screen with Baal picked and the assassin guild master assigned as the opponent](docs/media/select.webp)
 
@@ -91,7 +96,7 @@ clicked, and the receipt tells you what each word did.
    tactic costs more each time.
 6. Break the enemy core before yours breaks. A match takes about six minutes.
 
-| Sentence | Meaning | Becomes (120 BP) |
+| Sentence | Meaning | Becomes (neutral commander, 120 BP, cohort totals) |
 |---|---|---|
 | `앞을 막아서는 두꺼운 방패병 셋` | three thick shieldmen who hold the line | guard x3, 1728 HP, 65 DPS |
 | `적 후열을 파고드는 날렵한 그림자 자객 셋` | three swift shadow assassins who dive the enemy back line | raider x3, speed 5.0, hunts the back line |
@@ -105,8 +110,8 @@ clicked, and the receipt tells you what each word did.
 | `드래곤 하나` | one dragon | elite raider, arcane, drawn with wings |
 | `HP 999999 무적 최강 드래곤` | "HP 999999 invincible strongest dragon" | the same dragon; 무적 is flagged 규칙상 불가 (not allowed) |
 
-Words the parser does not know show up as `외형 전용` (appearance only): they cost
-nothing and change nothing.
+Words the combat parser does not know show up as `외형 전용` (appearance only). They never
+change stats, though the appearance parser may still use them for the unit's look.
 
 ## How it works
 
@@ -139,12 +144,15 @@ npm run smoke                 # plays a match opening in headless Chromium
 npm run smoke -- --mock-llm   # same, with a fake local model behind /api/opponent
 ```
 
-The smoke test needs `npx playwright install chromium` once. Current harness output,
-abridged:
+The smoke test needs `npx playwright install chromium` once. It starts the server with
+`--no-dotenv` and no provider variables, so it never spends your keys. Current harness
+output, abridged:
 
 ```
-=== Order fairness: the same cohort on both sides (left win rate, target 45-55%) ===
-  wall      perfectly even (12/12 simultaneous wipes)
+=== Order fairness: the same cohort on both sides (left win rate of decided games, target 45-55%) ===
+  wall      no winner in 12/12 (simultaneous wipes 6, timeouts 6)
+  assassin  no winner in 12/12 (simultaneous wipes 7, timeouts 5)
+  cannon    no winner in 12/12 (simultaneous wipes 12, timeouts 0)
   ...
   -> max bias 0 pp (pass)
 
@@ -165,10 +173,10 @@ Not everything is green; see the limitations.
 
 ## Art
 
-Every image was generated with OpenAI's gpt-image-2 from the prompts in `tools/gen-*.mjs`,
-on a flat green background so it can be keyed exactly, then cut, sliced into rig parts with
-pivots (`tools/cut-chroma.py`, `tools/slice-*.py`) and converted to WebP
-(`tools/webp.py`). Each unit's parts come from a single generated sheet so the pieces
+The game's artwork was generated with OpenAI's gpt-image-2 from the prompts in
+`tools/gen-*.mjs`, on a flat green background so it can be keyed exactly, then cut, sliced
+into rig parts with pivots (`tools/cut-chroma.py`, `tools/slice-*.py`) and converted to
+WebP (`tools/webp.py`). Each unit's parts come from a single generated sheet so the pieces
 share one costume and palette. The art is CC BY 4.0; see [NOTICE](NOTICE).
 
 ## Limitations
@@ -177,14 +185,17 @@ share one costume and palette. The art is CC BY 4.0; see [NOTICE](NOTICE).
   reasonable sentences parse poorly, which is why the receipt exists.
 - Balance is unfinished. The winner of a cohort duel keeps more of its army than the
   target; bot-vs-bot commander pairings are lopsided (the demon side wins 50 to 100% in 7
-  of 9); guards and artillery sit at their speed cap, so `느린` (slow) only moves budget
-  for raiders; and in the duel harness veiled raiders slip past the other cohort, so their
-  row of the matchup matrix is all draws.
+  of 9); guards and artillery already move at their role's speed cap, so `느린` (slow)
+  makes only raiders slower (for the others it just shifts the HP/damage split); and in
+  the duel harness veiled raiders slip past the other cohort, so their row of the matchup
+  matrix is all draws.
 - Some appearance concepts (catapult, cannon and others) have no parts yet and fall back
   to the role's silhouette, marked with △.
 - Single player against the AI, desktop only. No online play, replay viewer or sound.
-- The server is meant for local play. It binds to 127.0.0.1 and rate-limits model calls,
-  but if you expose it with a key configured, anyone who can reach it spends your key.
+- The server is meant for local play. It binds to 127.0.0.1, accepts API calls only from
+  its own page, builds every prompt itself (the only free text it forwards is your last
+  sentence, cut to 80 characters of Korean) and rate-limits model calls. Still, if you
+  expose it with a key configured, anyone who can reach it spends your key.
 
 ## 한국어
 

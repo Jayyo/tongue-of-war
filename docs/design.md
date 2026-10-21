@@ -20,8 +20,8 @@ sentence -> parser -> UnitIntent -> BP compiler -> unit stats
 `UnitIntent` (`src/domain/budget.js`) has no HP, damage, range or cost fields. It holds
 enums (role, cohort size, attack shape, damage channel, formation, persistence, ward
 direction, target preference), five priorities in -3..3, a count from {1, 2, 3, 5} and up
-to two skill ids from a fixed pool. The only numbers the player chooses directly are the
-ritual size (80 / 120 / 180 BP), picked with a button, and the BP budget is the cost.
+to two skill ids from a fixed pool. No field takes a raw number. The budget is the ritual
+size (80 / 120 / 180 BP), picked with a button, and it is also the price.
 
 So "HP 999999", "invincible" or "ignore the rules" are not filtered out; they have
 nowhere to go. `HP 999999 무적 최강 드래곤` compiles to the same unit as `드래곤 하나`.
@@ -134,7 +134,7 @@ the browser and in Node, which is what makes the headless harness and the tests 
   list by slot, and target tie-breaks hash (seed, sorted slot pair) using integers only.
   Hashing unit ids gave the side that spawned first a different distribution, and float
   lane positions that drifted by 1e-15 between mirrored sides flipped hashed tie-breaks.
-  `test/sim.test.mjs` checks that identical cohorts end exactly even.
+  `test/sim.test.mjs` checks that identical cohorts wipe each other out on the same tick.
 - **2D distance** (x plus lane offset). Melee units reaching across five lanes to
   focus one target made split cohorts much weaker than the cost model assumed.
 - **No hit RNG.** The seed decides starting conditions only; combat resolution is
@@ -152,13 +152,20 @@ worth watching (reading what the opponent wrote and seeing what it became) would
 The prompt describes the meaning space (roles, sizes, channels, skills) rather than the
 parser's dictionary, so the model writes sentences instead of keyword lists.
 
-The browser sends only a public snapshot: wave, time, essence, front line, structure HP,
-revealed cohorts, live signals and the human's last summoned sentence. Never the human's
-essence or unsent text. The server validates the snapshot field by field and builds the
-prompt itself (`src/ai/opponent-prompt.js`), so `/api/opponent` is not a general LLM
-relay. Answers are cached on a quantized situation key, so a match costs a handful of
-calls. Any failure (no key, timeout, empty answer, rate limit) falls back to the scripted
-bot, and the quote box says which one wrote the line.
+The browser sends only a public snapshot: wave, time, the AI's own essence, front line,
+structure HP, revealed cohorts, live signals and the human's last summoned sentence. Never
+the human's essence or unsent text. The server validates the snapshot field by field and
+builds the prompt itself (`src/ai/opponent-prompt.js`); the only free text that reaches
+the model is that last sentence, cut to 80 characters of Korean. The API also refuses
+other origins and non-JSON requests, so a web page elsewhere cannot spend the key through
+the player's browser. Answers are cached per quantized situation, so a repeated situation
+reuses its sentence instead of calling the model again. Any failure (no key, timeout,
+empty answer, rate limit) falls back to the scripted bot, and the quote box says which
+one wrote the line.
+
+The model's sentence is priced exactly like the player's: context discount when it answers
+a live signal, repeat surcharge against its own history. The keyless bot is simpler: it
+picks from a fixed book of sentences and pays list price.
 
 Difficulty changes the information the opponent gets, not the model: novice sees one
 signal and fuzzy counts, duel two signals with exact counts, abyss three. Swapping models
