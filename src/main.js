@@ -28,7 +28,7 @@ const state = {
   chosen: null, battle: null, render: null, mySide: SIDE.L,
   tier: 'standard', castCost: null,
   lastBlueprint: null, lastPrompt: '', lastIntent: null, lastTier: 'standard',
-  cards: [], scrollHistory: [], castLog: [],
+  cards: [], scrollHistory: [], foeHistory: [], castLog: [],
   raf: 0, acc: 0, lastNow: 0,
   aiWave: 0, aiBusy: false, aiMode: 'unknown', diff: 'duel', transmuting: false,
 };
@@ -134,7 +134,7 @@ async function startBattle() {
   });
   state.mySide = myside;
   Object.assign(state, {
-    cards: [], scrollHistory: [], castLog: [], lastBlueprint: null, lastIntent: null, transmuting: false,
+    cards: [], scrollHistory: [], foeHistory: [], castLog: [], lastBlueprint: null, lastIntent: null, transmuting: false,
     lastTier: state.tier, aiWave: 0, aiBusy: false,
   });
 
@@ -217,16 +217,19 @@ function buyUpgrade(id) {
 }
 
 // ---------------------------------------------------------------- prompting
-/** interpret -> context claim -> tactic grant -> compile -> price */
-function interpretNow(text, tierKey = state.tier, history = state.scrollHistory) {
-  const B = state.battle;
-  const p = player(B, state.mySide);
+/**
+ * interpret -> context claim -> tactic grant -> compile -> price, for either side.
+ * The player's sentence and the LLM opponent's sentence both come through here, so
+ * both get the context discount and both pay the repeat surcharge.
+ */
+function planCast(B, side, text, tierKey, history) {
+  const p = player(B, side);
   if (!text) return null;
 
   const intent = stubInterpret(text, p.commander);
-  const live = computeSignals(B, state.mySide);
+  const live = computeSignals(B, side);
   const claim = extractClaim(text);
-  const verdict = verifyClaim(claim, live);
+  let verdict = verifyClaim(claim, live);
   if (verdict.ok && verdict.mechanism) {
     intent.claimSignal = claim.signal;
     if (!intent.skills.includes(verdict.mechanism)) {
@@ -236,14 +239,24 @@ function interpretNow(text, tierKey = state.tier, history = state.scrollHistory)
 
   const tier = CFG.ritual.tiers[tierKey];
   const bp = compile(intent, tier.bp, p.commander);
+  // Skills the role cannot take, or that did not fit the budget, are reported, and a
+  // context claim only pays out if its mechanism actually made it onto the unit.
+  const dropped = intent.skills.filter((k) => !bp.skills.includes(k));
+  if (verdict.ok && dropped.includes(verdict.mechanism)) {
+    delete intent.claimSignal;
+    verdict = { ok: false, reason: `${SKILLS[verdict.mechanism]?.label ?? verdict.mechanism}이(가) 예산에 들어가지 않아 대응이 인정되지 않는다` };
+  }
   const R = CFG.ritual;
   const echo = echoMultiplier(intent, history);
   const base = verdict.ok ? tier.cost * R.contextDiscount : tier.cost;
   const cost = Math.ceil((base * echo) / 5) * 5;
   // Appearance is parsed on a SEPARATE path and never touches `bp`.
   const visual = interpretVisual(text, intent, p.commander);
-  return { intent, bp, text, live, claim, verdict, cost, echo, tierCost: tier.cost, visual };
+  return { intent, bp, text, live, claim, verdict, cost, echo, tierCost: tier.cost, visual, dropped };
 }
+
+const interpretNow = (text, tierKey = state.tier, history = state.scrollHistory) =>
+  planCast(state.battle, state.mySide, text, tierKey, history);
 
 function preview() {
   const B = state.battle;
@@ -316,18 +329,18 @@ function receiptHtml(r) {
   const tr = intent.trace ?? {};
   const chips = [];
   if (tr.targetSpan) {
-    chips.push(`<span class="sp tgt"><b>적 ${tr.targetSpan}</b><i>${TARGET_LABEL[bp.targetPreference] ?? ''}</i></span>`);
+    chips.push(`<span class="sp tgt"><b>적 ${esc(tr.targetSpan)}</b><i>${TARGET_LABEL[bp.targetPreference] ?? ''}</i></span>`);
   }
   for (const sp of (tr.spans ?? []).slice(0, 4 - chips.length)) {
-    chips.push(`<span class="sp"><b>${sp.text}</b><i>${sp.effects.slice(0, 2).join('·')}</i></span>`);
+    chips.push(`<span class="sp"><b>${esc(sp.text)}</b><i>${esc(sp.effects.slice(0, 2).join('·'))}</i></span>`);
   }
   // The appearance chip answers "did the game understand what I asked to SEE?".
   // It is deliberately the last chip: stats first, looks second.
   if (r.visual) {
     const v = r.visual;
     const label = v.rigReady ? '외형' : '외형(대체)';
-    chips.push(`<span class="sp vis" title="${visualSummary(v)}${v.fallback.used ? ' — ' + v.fallback.reason : ''}">` +
-      `<b>${label}</b><i>${v.concept}${v.rigReady ? '' : ' △'}</i></span>`);
+    chips.push(`<span class="sp vis" title="${esc(visualSummary(v))}${v.fallback.used ? ' — ' + esc(v.fallback.reason) : ''}">` +
+      `<b>${label}</b><i>${esc(v.concept)}${v.rigReady ? '' : ' △'}</i></span>`);
   }
   const dead = (tr.unmatched ?? []).length;
   const voided = (tr.voided ?? []).length;
@@ -356,6 +369,7 @@ function detailHtml(r) {
       ${cost !== tierCost ? `<span class="dim">(기본 ${tierCost})</span>` : ''}</div>
     ${verdict?.reason ? `<div class="${verdict.ok ? 'good' : 'warn'}">${verdict.ok ? '✔' : '✖'} ${esc(verdict.reason)}</div>` : ''}
     ${bp.skills.length ? `<div>스킬: ${bp.skills.map((k) => `<b>${SKILLS[k].label}</b> — ${SKILLS[k].desc}`).join('<br>')}</div>` : ''}
+    ${r.dropped?.length ? `<div class="warn">빠진 스킬: ${esc(r.dropped.map((k) => SKILLS[k]?.label ?? k).join(', '))} (역할 제한 또는 예산 초과)</div>` : ''}
     ${(tr.unmatched ?? []).length ? `<div class="dim">외형 전용(0BP): ${esc(tr.unmatched.join(', '))}</div>` : ''}
     ${(tr.voided ?? []).length ? `<div class="warn">규칙상 불가: ${esc(tr.voided.join(', '))}</div>` : ''}
     <div class="dim">해석 신뢰도 ${conf}%</div>`;
@@ -559,19 +573,20 @@ async function runOpponent(B) {
       if (B !== state.battle || B.over) return;
       if (got.sentence) {
         const p = player(B, side);
-        const intent = stubInterpret(got.sentence, p.commander);
-        const tierKey = p.essence >= CFG.ritual.tiers.greater.cost ? 'greater'
-          : p.essence >= CFG.ritual.tiers.standard.cost ? 'standard' : 'small';
-        const tier = CFG.ritual.tiers[tierKey];
-        const bp = compile(intent, tier.bp, p.commander);
-        // the AI's sentence goes through the SAME appearance path as the player's
-        bp.visual = interpretVisual(got.sentence, intent, p.commander);
-        if (queueContract(B, side, bp, tier.cost)) {
-          p.lastSentence = got.sentence;
-          p.lastSummonFx = B.t;
-          showFoeQuote(p, got.sentence, got.cached ? `${got.provider} · 캐시` : `${got.provider} · ${got.ms}ms`, bp);
-          logMsg(B, sideKind(side), `상대 주문: "${got.sentence}"`);
-          return;
+        // The biggest ritual it can afford, priced exactly like the player's cast.
+        const plan = ['greater', 'standard', 'small']
+          .map((tierKey) => planCast(B, side, got.sentence, tierKey, state.foeHistory))
+          .find((c) => p.essence >= c.cost);
+        if (plan) {
+          plan.bp.visual = plan.visual;
+          if (queueContract(B, side, plan.bp, plan.cost)) {
+            state.foeHistory.push(plan.intent);
+            p.lastSentence = got.sentence;
+            p.lastSummonFx = B.t;
+            showFoeQuote(p, got.sentence, got.cached ? `${got.provider} · 캐시` : `${got.provider} · ${got.ms}ms`, plan.bp);
+            logMsg(B, sideKind(side), `상대 주문: "${got.sentence}"${plan.verdict.ok ? ' (문맥 대응)' : ''}`);
+            return;
+          }
         }
         reason = 'unaffordable';
       } else {
@@ -698,7 +713,7 @@ function endBattle(B) {
     <tr><td class="rc-text">${esc(c.text)}</td>
         <td class="rc-mid">${roleLabel(c.role)} ${c.count}기</td>
         <td class="rc-mid">HP ${c.hp} · DPS ${c.dps}</td>
-        <td class="rc-look">${c.concept}</td>
+        <td class="rc-look">${esc(c.concept)}</td>
         <td class="rc-cost">◆${c.cost}</td></tr>`).join('');
   $('result-body').innerHTML = `
     <div>${B.endReason} · <b>${fmt(B.t)}</b> · 제${B.wave}국면</div>
