@@ -148,9 +148,10 @@ export function stubInterpret(prompt, commander) {
     persistence: /** @type {any} */ (persistence ?? 'steady'),
     wardAgainst,
     priorities: {
-      // Negative priorities are REAL. "느린 탱크" (slow tank), "값싼 군단" (cheap horde)
-      // ask to take budget OUT of an axis and spend it elsewhere. Clamping at 0 made
-      // the word vanish: "느린 탱크 셋" and "탱크 셋" used to compile to the same speed.
+      // Negative priorities are REAL. "느린 자객" (slow assassins) asks to take budget
+      // OUT of speed and spend it elsewhere; clamping at 0 made the word vanish.
+      // (Guards and artillery already sit at their role's speed cap of 3.0, so for
+      // them "느린" only shifts the HP/damage split.)
       hp: clamp(pr.hp, -3, 3), damage: clamp(pr.damage, -3, 3), range: clamp(pr.range, -3, 3),
       speed: clamp(pr.speed, -3, 3), defense: clamp(pr.defense, -3, 3),
     },
