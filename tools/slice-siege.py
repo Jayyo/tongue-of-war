@@ -90,13 +90,13 @@ def main(name):
         'track':  [0.50, 0.50],
         'turret': [0.45, 0.90],   # rotates on the hull deck
         'barrel': [0.06, 0.55],   # pivots at the breech, muzzle swings
-        'plate':  [0.85, 0.60],   # hinges at the hull nose
+        'plate':  [0.08, 0.60],   # mounting tab on the plate's left edge
     }
     manifest['mounts'] = {
         'track':  [0.50, 1.00],
         'turret': [0.42, 0.16],
         'barrel': [0.78, 0.45],
-        'plate':  [0.02, 0.70],
+        'plate':  [0.94, 0.70],   # hull nose: every part is drawn facing screen-right
     }
     (out / 'rig.json').write_text(json.dumps(manifest, indent=1), encoding='utf-8')
     print(f'   -> rig.json')

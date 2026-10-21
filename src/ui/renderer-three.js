@@ -55,14 +55,19 @@ export function makeRenderer(canvas) {
   // Cut-out rig manifests. A unit with a manifest gets a real articulated
   // skeleton; anything without one keeps the single-sprite path, so art can be
   // upgraded unit by unit instead of all at once.
-  const rigManifests = new Map();   // "human-artillery" -> manifest | null
+  // Callbacks always run asynchronously: unitView() registers one before it has
+  // stored its own view object. The earlier version answered cached kinds
+  // synchronously (so every unit after the first got no rig) and answered `null`
+  // to units that asked while the first fetch was still in flight, which is why
+  // only one tank in a "탱크 셋" cohort was drawn as a tank.
+  const rigManifests = new Map();   // "human-artillery" -> Promise<manifest | null>
   function loadManifest(kind, cb) {
-    if (rigManifests.has(kind)) { cb(rigManifests.get(kind)); return; }
-    rigManifests.set(kind, null);
-    fetch(`./assets/unit-parts/${kind}/rig.json`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { rigManifests.set(kind, j); cb(j); })
-      .catch(() => cb(null));
+    if (!rigManifests.has(kind)) {
+      rigManifests.set(kind, fetch(`./assets/unit-parts/${kind}/rig.json`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null));
+    }
+    rigManifests.get(kind).then(cb);
   }
 
   // ------------------------------------------------------------------ lights
@@ -556,7 +561,9 @@ export function makeRenderer(canvas) {
         } else {
           ct = 0; blend = 0;
         }
-        v.rig.root.scale.setScalar(size * 0.92);
+        // Part sheets are drawn facing screen-right, like the flat sprites, so the
+        // right-hand side has to be mirrored too or its units walk backwards.
+        v.rig.root.scale.set(face * size * 0.92, size * 0.92, size * 0.92);
         v.rig.pose(v.rig.family === 'biped' || !v.rig.family ? rigClip : SIEGE_CLIP,
                    ct, B.t, u.id * 0.7, walking, blend);
 

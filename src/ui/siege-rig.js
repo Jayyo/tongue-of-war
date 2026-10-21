@@ -107,7 +107,7 @@ export function buildSiegeRig(manifest, texFor, unitHeight) {
     joints.barrel.position.set((mx - 0.5) * turret.w, (0.5 - my) * turret.h, 0);
   }
   if (joints.plate && hull) {
-    const [mx, my] = manifest.mounts?.plate ?? [0.02, 0.70];
+    const [mx, my] = manifest.mounts?.plate ?? [0.94, 0.70];   // the hull nose
     joints.plate.position.set((mx - 0.5) * hull.w, (0.5 - my) * hull.h, 0);
   }
 
