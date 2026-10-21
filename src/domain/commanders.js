@@ -87,8 +87,8 @@ export const COMMANDERS = [
     mechanic: {
       id: 'forge',
       label: '대장간 경제',
-      desc: '모든 교리 업그레이드 비용 -20%, 재연성 비용 -37%. 대신 모든 편제 이동속도 -5%.',
-      upgradeDiscount: 0.20, recastCost: 25,
+      desc: '교리 업그레이드 비용 -20%. 대신 모든 편제 이동속도 -5%.',
+      upgradeDiscount: 0.20,
     },
     systemPrompt:
       '갑옷, 방패, 자동인형, 골렘, 제련된 무기와 견고한 진형을 선호한다. ' +

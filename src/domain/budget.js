@@ -147,10 +147,10 @@ export function compile(intent, bp, commander) {
   if (commander?.rangeMax) range = Math.min(range, commander.rangeMax);
   cRange = costOf.range(range);
 
-  let speed = clamp(speedFromBp(cSpeed), Math.max(C.limits.speedMin, roleCfg.speedMin ?? C.limits.speedMin),
-                    Math.min(C.limits.speedMax, roleCfg.speedMax ?? C.limits.speedMax));
-  speed *= commander?.speedMul ?? 1;
-  speed = clamp(speed, C.limits.speedMin, C.limits.speedMax);
+  // A commander's speedMul is a penalty the sim applies at spawn (with the doctrine
+  // multipliers). Applying it here as well charged it twice and priced it as a refund.
+  const speed = clamp(speedFromBp(cSpeed), Math.max(C.limits.speedMin, roleCfg.speedMin ?? C.limits.speedMin),
+                      Math.min(C.limits.speedMax, roleCfg.speedMax ?? C.limits.speedMax));
   cSpeed = costOf.speed(speed);
 
   // ---- 5. hp / dps / defense share the rest, then converge against synergy tax

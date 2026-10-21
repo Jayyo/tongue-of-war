@@ -605,7 +605,7 @@ function paintHud(B) {
   for (const b of $('upgrade-row').children) {
     const owned = me.upgrades.includes(b.dataset.id);
     b.classList.toggle('owned', owned);
-    const cost = tier ? Math.round(tier.cost * (me.commander.mechanic.id === 'forge' ? 0.8 : 1)) : 0;
+    const cost = tier ? Math.round(tier.cost * (me.commander.mechanic.id === 'forge' ? 1 - me.commander.mechanic.upgradeDiscount : 1)) : 0;
     b.disabled = !tier || B.t < tier.unlockAt || me.essence < cost;
     const span = b.querySelector('span');
     span.textContent = !tier ? '' : B.t < tier.unlockAt ? `${Math.ceil(tier.unlockAt - B.t)}s` : `◈${cost}`;

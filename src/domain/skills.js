@@ -71,7 +71,7 @@ export const SKILLS = {
   },
   veil: {
     id: 'veil', label: '은폐', bp: 6, kind: 'stealth',
-    desc: '첫 공격 또는 4초 후 해제. 은폐 중 표적 지정 불가.',
+    desc: '첫 공격 또는 9초 후 해제. 은폐 중 표적 지정 불가.',
     roles: ['raider'],
     params: { dur: 9 },   // 4 s ran out before most raiders reached their target
   },

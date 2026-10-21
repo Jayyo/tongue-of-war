@@ -339,7 +339,7 @@ export const CFG = {
     doctrines: {
       ruin:   { label: '파괴 교리', dps: 1.10 },
       ward:   { label: '수호 교리', hp: 1.12 },
-      swift:  { label: '기동 교리', speed: 1.08, moveCd: 0.94 },
+      swift:  { label: '기동 교리', speed: 1.08 },
       arcane: { label: '비술 교리', skillCd: 0.90 },
     },
   },
