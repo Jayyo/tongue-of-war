@@ -8,7 +8,11 @@
     "start": "node server.js",
     "test": "node --test",
     "balance": "node tools/balance.js",
-    "duel": "node tools/balance.js duel"
+    "balance:prompts": "node tools/balance.js prompts",
+    "balance:mirror": "node tools/balance.js mirror",
+    "balance:duel": "node tools/balance.js duel",
+    "visuals": "node tools/visuals.mjs",
+    "feel": "node tools/feel.mjs"
   },
   "dependencies": {
     "three": "^0.185.1"

@@ -1,5 +1,5 @@
-// "Feel" metrics — the numbers behind the three values that look wrong.
-// Everything here is measurable; none of it needed a human to play first.
+// "Feel" metrics: how fast structures fall, how long the core endgame lasts, and
+// how a cohort's damage decays as it loses bodies. All measured headlessly.
 //
 //   node tools/feel.mjs
 import { createBattle, step, queueContract, player, structOf, spawnCohort, SIDE, other } from '../src/engine/sim.js';
@@ -10,7 +10,7 @@ import { botThink } from '../src/ai/bot.js';
 import { CFG } from '../src/config.js';
 
 const DT = 0.05;
-const N = { id: 'neutral', faction: 'demon', name: '중립', bias: {}, mechanic: { id: 'none' } };
+const N = { id: 'neutral', faction: 'demon', name: 'neutral', bias: {}, mechanic: { id: 'none' } };
 const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
 // ---------------------------------------------------------------- 1. siege speed
@@ -35,19 +35,18 @@ function siegeTime(text, target) {
   return { contact, broke: s.hp <= 0 ? B.t : null, dur: s.hp <= 0 && contact != null ? B.t - contact : null, hp0 };
 }
 
-console.log('\n=== 1. 구조물 파괴 속도 (무방비 상태, 표준 120BP 한 편제) ===');
-console.log('   coreDamageMul =', CFG.combat.coreDamageMul, ' 보루 HP', CFG.structures.bastionHp, '· 코어 HP', CFG.structures.coreHp);
-for (const [label, text] of [['방패병 셋', '앞을 막아서는 두꺼운 방패병 셋'], ['자객 셋', '적 후열을 파고드는 날렵한 그림자 자객 셋'], ['장궁대 셋', '멀리서 꿰뚫는 강철 장궁대']]) {
+console.log('\n=== 1. Siege speed (one undefended 120 BP cohort) ===');
+console.log('   coreDamageMul =', CFG.combat.coreDamageMul, ' bastion HP', CFG.structures.bastionHp, '· core HP', CFG.structures.coreHp);
+for (const [label, text] of [['shields x3', '앞을 막아서는 두꺼운 방패병 셋'], ['assassins x3', '적 후열을 파고드는 날렵한 그림자 자객 셋'], ['longbows x3', '멀리서 꿰뚫는 강철 장궁대']]) {
   for (const target of ['bastion', 'core']) {
     const r = siegeTime(text, target);
-    const name = target === 'bastion' ? '보루' : '코어';
-    console.log(`   ${label.padEnd(9)} → ${name}: 접촉 ${r.contact == null ? '못함' : fmt(r.contact)}` +
-      (r.dur == null ? ' · 시간 내 파괴 실패' : ` · 파괴까지 ${r.dur.toFixed(1)}초`));
+    console.log(`   ${label.padEnd(12)} -> ${target.padEnd(7)}: contact ${r.contact == null ? 'never' : fmt(r.contact)}` +
+      (r.dur == null ? ' · not destroyed in time' : ` · destroyed after ${r.dur.toFixed(1)}s`));
   }
 }
 
 // ---------------------------------------------------------------- 2. real matches
-console.log('\n=== 2. 실제 경기에서 코어가 녹는 속도 (봇 대 봇 24판) ===');
+console.log('\n=== 2. How fast cores fall in real matches (24 bot-vs-bot games) ===');
 const rows = [];
 for (const [a, b] of [['lucifer', 'smith'], ['abaddon', 'alchemist'], ['baal', 'headsman']]) {
   for (let s = 0; s < 8; s++) {
@@ -78,26 +77,26 @@ const spans = num(rows.map((r) => r.span));
 const firsts = num(rows.map((r) => r.firstHit));
 const halves = num(rows.map((r) => r.half));
 const lens = num(rows.map((r) => r.t));
-console.log(`   경기 길이            중앙 ${fmt(p(lens, .5))}  (p10 ${fmt(p(lens, .1))} / p90 ${fmt(p(lens, .9))})`);
-console.log(`   첫 보루 타격         중앙 ${fmt(p(num(rows.map((r) => r.bast)), .5))}`);
-console.log(`   첫 코어 타격         중앙 ${fmt(p(firsts, .5))}`);
-console.log(`   코어 첫 타격→파괴     중앙 ${p(spans, .5)?.toFixed(1)}초  (p10 ${p(spans, .1)?.toFixed(1)} / p90 ${p(spans, .9)?.toFixed(1)})`);
-console.log(`   패자 코어 50% 도달   중앙 ${fmt(p(halves, .5))}  → 경기의 ${Math.round(p(halves, .5) / p(lens, .5) * 100)}% 지점`);
+console.log(`   match length                median ${fmt(p(lens, .5))}  (p10 ${fmt(p(lens, .1))} / p90 ${fmt(p(lens, .9))})`);
+console.log(`   first bastion hit           median ${fmt(p(num(rows.map((r) => r.bast)), .5))}`);
+console.log(`   first core hit              median ${fmt(p(firsts, .5))}`);
+console.log(`   first core hit -> core dead median ${p(spans, .5)?.toFixed(1)}s  (p10 ${p(spans, .1)?.toFixed(1)} / p90 ${p(spans, .9)?.toFixed(1)})`);
+console.log(`   losing core at 50%          median ${fmt(p(halves, .5))}  (${Math.round(p(halves, .5) / p(lens, .5) * 100)}% into the match)`);
 
 // ---------------------------------------------------------------- 3. attrition curves
-console.log('\n=== 3. 소모전 곡선이 실제로 어떻게 휘는가 ===');
+console.log('\n=== 3. Attrition: cohort damage as members die ===');
 console.log(`   cohortDpsRetention = ${CFG.combat.cohortDpsRetention}  ·  woundedDpsBonus = ${CFG.combat.woundedDpsBonus}`);
 {
   const bp = compile(stubInterpret('값싼 하급 군단 다섯, 수로 밀어붙인다', N), 120, N);
   const per = bp.dps, n = bp.count;
   const ret = CFG.combat.cohortDpsRetention ?? 0;
-  console.log(`   5기 편제(기당 DPS ${per.toFixed(0)}, 총 ${(per * n).toFixed(0)}):`);
+  console.log(`   5-body cohort (DPS ${per.toFixed(0)} each, ${(per * n).toFixed(0)} total):`);
   for (const dead of [0, 1, 2, 3, 4]) {
     const alive = n - dead;
     const share = alive > 0 ? per * (1 + (ret * dead) / alive) : 0;
-    console.log(`     ${dead}기 전사 → 생존 ${alive}기 · 기당 ${share.toFixed(0)} · 편제 총 ${(share * alive).toFixed(0)} ` +
-      `(원래의 ${Math.round((share * alive) / (per * n) * 100)}%)`);
+    console.log(`     ${dead} dead -> ${alive} alive · ${share.toFixed(0)} each · cohort ${(share * alive).toFixed(0)} ` +
+      `(${Math.round((share * alive) / (per * n) * 100)}% of the original)`);
   }
   const w = CFG.combat.woundedDpsBonus ?? 0;
-  console.log(`   부상 보너스: HP 100%→${(1).toFixed(2)}배 · 50%→${(1 + w * 0.5).toFixed(2)}배 · 10%→${(1 + w * 0.9).toFixed(2)}배`);
+  console.log(`   wounded bonus: at 100% HP x${(1).toFixed(2)} · 50% x${(1 + w * 0.5).toFixed(2)} · 10% x${(1 + w * 0.9).toFixed(2)}`);
 }

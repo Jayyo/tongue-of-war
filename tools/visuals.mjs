@@ -9,7 +9,7 @@ import { interpretVisual, visualSummary } from '../src/gen/visual.js';
 import { compile } from '../src/domain/budget.js';
 import { VISUAL_LEXICON, RIG_READY } from '../src/gen/visual-lexicon.js';
 
-const NEUTRAL = { id: 'neutral', faction: 'demon', name: '중립', bias: {}, mechanic: { id: 'none' } };
+const NEUTRAL = { id: 'neutral', faction: 'demon', name: 'neutral', bias: {}, mechanic: { id: 'none' } };
 
 const CASES = [
   '탱크 셋', '전차 부대', '기갑 사단', '드래곤 하나', '해골 군단 다섯',
@@ -19,7 +19,7 @@ const CASES = [
 ];
 
 let rows = 0, distinct = new Set(), fallbacks = 0;
-console.log('\n=== 문장 → 외형 (VisualIntent) ===');
+console.log('\n=== Sentence -> appearance (VisualIntent) ===');
 for (const text of CASES) {
   const ui = stubInterpret(text, NEUTRAL);
   const v = interpretVisual(text, ui, NEUTRAL);
@@ -29,13 +29,13 @@ for (const text of CASES) {
   console.log(
     `${text.padEnd(20)} → ${v.concept.padEnd(11)} rig=${v.rigFamily.padEnd(9)} ` +
     `${v.rigReady ? '  ' : '△ '}${visualSummary(v)}`);
-  if (v.unmatched.length) console.log(`${' '.repeat(22)}인식 못한 말: ${v.unmatched.join(', ')}`);
+  if (v.unmatched.length) console.log(`${' '.repeat(22)}not recognised: ${v.unmatched.join(', ')}`);
 }
 
 // ---- Gate 2: appearance words must be invisible to the compiler.
 // Compare a sentence against itself plus a pure-appearance word. If any BP number
 // moves, the appearance path has leaked into the stat path.
-console.log('\n=== BP 격리 검증 (외형 단어가 수치를 못 건드리는가) ===');
+console.log('\n=== Stat isolation (appearance words must not move any number) ===');
 const PAIRS = [
   ['방패병 셋', '방패병 셋'],                 // control: identical
   ['방패병 셋', '왕관을 쓴 방패병 셋'],
@@ -49,18 +49,18 @@ for (const [a, b] of PAIRS) {
   const diff = keys.filter((k) => String(bpA[k]) !== String(bpB[k]));
   const known = b !== a && diff.length > 0;
   if (known) leaks++;
-  console.log(`  "${a}" vs "${b}" → ${diff.length ? '차이: ' + diff.join(',') : '동일'}`);
+  console.log(`  "${a}" vs "${b}" -> ${diff.length ? 'differs: ' + diff.join(',') : 'identical'}`);
 }
 
 // ---- Gate 3: coverage of the lexicon vs what the renderer can build
 const byRig = {};
 for (const e of VISUAL_LEXICON) byRig[e.rig] = (byRig[e.rig] ?? 0) + 1;
-console.log('\n=== 사전 커버리지 ===');
+console.log('\n=== Lexicon coverage ===');
 for (const [rig, n] of Object.entries(byRig).sort((x, y) => y[1] - x[1])) {
-  console.log(`  ${rig.padEnd(10)} ${String(n).padStart(3)}개 ${RIG_READY.has(rig) ? '(조립 가능)' : '(골격 미구현 → 폴백)'}`);
+  console.log(`  ${rig.padEnd(10)} ${String(n).padStart(3)} words ${RIG_READY.has(rig) ? '(rig available)' : '(no rig yet -> fallback)'}`);
 }
 
 const ok = distinct.size >= rows - 2 && leaks === 0;
-console.log(`\n  서로 다른 외형: ${distinct.size}/${rows}  ·  폴백: ${fallbacks}  ·  BP 누출: ${leaks}`);
+console.log(`\n  distinct looks: ${distinct.size}/${rows}  ·  fallbacks: ${fallbacks}  ·  stat leaks: ${leaks}`);
 console.log(`  VISUALS=${ok ? 'PASS' : 'FAIL'}`);
 process.exitCode = ok ? 0 : 1;

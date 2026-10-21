@@ -1,14 +1,14 @@
 // @ts-check
 // Headless balance harness — runs the exact sim the browser runs.
 //
-//   node tools/balance.js            full sweep
+//   node tools/balance.js            full sweep (~45 s)
 //   node tools/balance.js prompts    prompt -> stat compile table
 //   node tools/balance.js mirror     order-fairness check (must be ~50/50)
 //   node tools/balance.js duel       one verbose match, wave by wave
 
 import {
   createBattle, step, queueContract, spawnCohort,
-  player, other, structOf, SIDE, roleLabel,
+  player, other, structOf, SIDE,
 } from '../src/engine/sim.js';
 import { compile } from '../src/domain/budget.js';
 import { stubInterpret } from '../src/gen/interpreter.js';
@@ -48,7 +48,7 @@ const REFERENCE = [
 ];
 const byKey = Object.fromEntries(REFERENCE.map((r) => [r.key, r.text]));
 
-const NEUTRAL = { id: 'neutral', faction: 'demon', name: '중립', bias: {}, mechanic: { id: 'none' } };
+const NEUTRAL = { id: 'neutral', faction: 'demon', name: 'neutral', bias: {}, mechanic: { id: 'none' } };
 
 // ---------------------------------------------------------------- cohort duel
 /**
@@ -178,9 +178,9 @@ function fullMatch(cmdIdA, cmdIdB, seed, verbose = false, demonLeft = true) {
         const l = structOf(B, SIDE.L, 'core'), r = structOf(B, SIDE.R, 'core');
         const lb = structOf(B, SIDE.L, 'bastion'), rb = structOf(B, SIDE.R, 'bastion');
         console.log(
-          `w${String(B.wave).padStart(2)} ${fmt(B.t)} | 전선 ${pct(frontPct(B))} | ` +
-          `L 보루${pct(lb.hp / lb.maxHp)} 코어${pct(l.hp / l.maxHp)} · R 보루${pct(rb.hp / rb.maxHp)} 코어${pct(r.hp / r.maxHp)} | ` +
-          `유닛 ${B.units.filter((u) => u.side === SIDE.L && u.hp > 0).length}v${B.units.filter((u) => u.side === SIDE.R && u.hp > 0).length}`);
+          `w${String(B.wave).padStart(2)} ${fmt(B.t)} | front ${pct(frontPct(B))} | ` +
+          `L bastion${pct(lb.hp / lb.maxHp)} core${pct(l.hp / l.maxHp)} · R bastion${pct(rb.hp / rb.maxHp)} core${pct(r.hp / r.maxHp)} | ` +
+          `units ${B.units.filter((u) => u.side === SIDE.L && u.hp > 0).length}v${B.units.filter((u) => u.side === SIDE.R && u.hp > 0).length}`);
       }
     }
   }
@@ -215,27 +215,32 @@ function frontPct(B) {
   const rMin = rs.length ? Math.min(...rs.map((u) => u.x)) : CFG.field.length;
   return ((lMax + rMin) / 2) / CFG.field.length;
 }
+const CADENCE = { '연타': 'flurry', '균형': 'balanced', '강타': 'crush' };
+const END_REASON = {
+  '코어 파괴': 'core destroyed', '균열 붕괴 중 코어 파괴': 'core destroyed in overtime',
+  '동시 붕괴 — 잔여 코어 우세로 판정': 'both cores fell; higher core HP wins', '시간 종료 — 코어 잔여 판정': 'time limit; higher core HP wins',
+};
 const pct = (v) => `${String(Math.round(v * 100)).padStart(3)}%`;
 const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
 // ---------------------------------------------------------------- reports
 function reportCompile() {
-  console.log('\n=== 프롬프트 해석 & BP 컴파일 (중립 사령관, 120BP) ===');
+  console.log('\n=== Sentence -> blueprint (neutral commander, 120 BP) ===');
   for (const r of REFERENCE) {
     const intent = stubInterpret(r.text, NEUTRAL);
     const bp = compile(intent, 120, NEUTRAL);
     console.log(
-      `${r.key.padEnd(9)} ${roleLabel(bp.role).padEnd(4)} ${String(bp.count).padStart(2)}기 ` +
+      `${r.key.padEnd(9)} ${bp.role.padEnd(9)} x${bp.count} ` +
       `HP${String(Math.round(bp.totalHp)).padStart(4)} DPS${String(Math.round(bp.totalDps)).padStart(3)} ` +
-      `R${bp.range.toFixed(1)} V${bp.speed.toFixed(1)} ${bp.channel === 'arcane' ? '비술' : '물리'} ` +
-      `${bp.cadenceLabel} 저항${Math.round(bp.resistPhysical * 100)} ` +
+      `R${bp.range.toFixed(1)} V${bp.speed.toFixed(1)} ${bp.channel.padEnd(8)} ` +
+      `${CADENCE[bp.cadenceLabel] ?? bp.cadenceLabel} res${Math.round(bp.resistPhysical * 100)} ` +
       `[${bp.skills.join(',') || '-'}] ${bp.breakdown.total}/${bp.breakdown.budget}BP`);
   }
 }
 
 /** ORDER FAIRNESS: the same cohort on both sides must not favour a side. */
 function reportMirror() {
-  console.log('\n=== 순서 공정성 — 동일 편제 미러전 (좌측 승률, 목표 45~55%) ===');
+  console.log('\n=== Order fairness: the same cohort on both sides (left win rate, target 45-55%) ===');
   let worst = 0;
   for (const r of REFERENCE) {
     let lw = 0, draws = 0;
@@ -249,18 +254,18 @@ function reportMirror() {
     // not count toward the left-side win rate.
     const decided = N - draws;
     if (decided === 0) {
-      console.log(`  ${r.key.padEnd(9)} 완전 대칭 (${N}/${N} 동시 전멸)`);
+      console.log(`  ${r.key.padEnd(9)} perfectly even (${N}/${N} simultaneous wipes)`);
       continue;
     }
     const rate = Math.round((lw / decided) * 100);
     worst = Math.max(worst, Math.abs(rate - 50));
-    console.log(`  ${r.key.padEnd(9)} 좌측 ${String(rate).padStart(3)}%  (승부 ${decided}/${N}, 동시전멸 ${draws})`);
+    console.log(`  ${r.key.padEnd(9)} left ${String(rate).padStart(3)}%  (decided ${decided}/${N}, simultaneous wipes ${draws})`);
   }
-  console.log(`  → 최대 편향 ${worst}%p ${worst <= 20 ? '(합격)' : '(불합격: 처리 순서 편향 잔존)'}`);
+  console.log(`  -> max bias ${worst} pp ${worst <= 20 ? '(pass)' : '(FAIL: processing-order bias)'}`);
 }
 
 function reportTriangle() {
-  console.log('\n=== 상성 행렬 (120BP, 좌우 교대 6쌍 평균, 행이 열을 이긴 비율) ===');
+  console.log('\n=== Matchup matrix (120 BP, 6 games per pair with sides swapped; % of games the row won) ===');
   const keys = REFERENCE.map((r) => r.key);
   console.log('           ' + keys.map((k) => k.slice(0, 5).padStart(6)).join(''));
   let asymWorst = 0;
@@ -304,10 +309,10 @@ function reportTriangle() {
   fights.sort((x, y) => x - y);
   remains.sort((x, y) => x - y);
   const p = (arr, q) => arr.length ? arr[Math.floor(arr.length * q)] : 0;
-  console.log(`\n  역방향 승률 합 편차(최대): ${Math.round(asymWorst)}%p ${asymWorst <= 20 ? '(합격)' : '(불합격)'}` +
-    (undecided ? `  · 전부 동시전멸이라 판정 제외한 쌍 ${undecided}개` : ''));
-  console.log(`  교전 지속: p10 ${p(fights, .1).toFixed(1)}s / p50 ${p(fights, .5).toFixed(1)}s / p90 ${p(fights, .9).toFixed(1)}s  (목표 p50 10~14s, p10 ≥7s)`);
-  console.log(`  승자 잔존 전투가치: p50 ${Math.round(p(remains, .5) * 100)}%  (목표 15~30%)`);
+  console.log(`\n  A-vs-B + B-vs-A win rates, max deviation from 100%: ${Math.round(asymWorst)} pp ${asymWorst <= 20 ? '(pass)' : '(FAIL)'}` +
+    (undecided ? `  · ${undecided} pairs skipped (only simultaneous wipes)` : ''));
+  console.log(`  fight length: p10 ${p(fights, .1).toFixed(1)}s / p50 ${p(fights, .5).toFixed(1)}s / p90 ${p(fights, .9).toFixed(1)}s  (target p50 10-14 s, p10 >= 7 s)`);
+  console.log(`  winner's surviving value: p50 ${Math.round(p(remains, .5) * 100)}%  (target 15-30%)`);
   return { matrix, firstEngagements };
 
   /** @returns {{wins:number, decided:number}} draws/timeouts are excluded from both. */
@@ -349,13 +354,13 @@ function reportPromptViability(matrix) {
   const pass = weakestMean.mean >= 0.30 && strongestMean.mean <= 0.70 &&
     weakestBest.best >= 0.50 && rowSd <= 0.12;
 
-  console.log('\n=== 프롬프트 생존성 게이트 (무승부=0.5승) ===');
-  console.log('  편제 평균: ' + rows.map((r) => `${r.key}=${Math.round(r.mean * 100)}%`).join(' '));
-  console.log(`  개별 상성 셀 30~70% 이탈(정보용): ${hardCells.length}/${pairScores.length} cells`);
-  console.log(`  최약 평균: ${weakestMean.key} ${pct(weakestMean.mean)}  (하한 30%)`);
-  console.log(`  최강 평균: ${strongestMean.key} ${pct(strongestMean.mean)}  (상한 70%)`);
-  console.log(`  최약 편제의 최고 상성: ${weakestBest.key} ${pct(weakestBest.best)}  (하한 50%)`);
-  console.log(`  편제별 평균 승점 표준편차: ${(rowSd * 100).toFixed(1)}%p  (상한 12%p)`);
+  console.log('\n=== Sentence viability gate (a draw counts as half a win) ===');
+  console.log('  mean score: ' + rows.map((r) => `${r.key}=${Math.round(r.mean * 100)}%`).join(' '));
+  console.log(`  single matchups outside 30-70% (info only): ${hardCells.length}/${pairScores.length} cells`);
+  console.log(`  weakest mean: ${weakestMean.key} ${pct(weakestMean.mean)}  (floor 30%)`);
+  console.log(`  strongest mean: ${strongestMean.key} ${pct(strongestMean.mean)}  (ceiling 70%)`);
+  console.log(`  best matchup of the weakest design: ${weakestBest.key} ${pct(weakestBest.best)}  (floor 50%)`);
+  console.log(`  spread of mean scores (std dev): ${(rowSd * 100).toFixed(1)} pp  (ceiling 12 pp)`);
   console.log(`  PROMPT_VIABILITY=${pass ? 'PASS' : 'FAIL'}`);
 }
 
@@ -376,20 +381,20 @@ function reportFormationGate(firstEngagements) {
     overlap <= CFG.gates.allyOverlapP95Max &&
     Math.abs(change) <= CFG.gates.firstEngagementTolerance;
 
-  console.log('\n=== 진형·가시성 게이트 (헤드리스 실측) ===');
+  console.log('\n=== Formation and readability gate (headless) ===');
   console.log(
-    `  전열↔포격 후열 x 간격: p50 ${gap.toFixed(2)}m ` +
-    `(하한 ${CFG.gates.formationGapMin.toFixed(1)}m, n=${geometry.gaps.length})`);
+    `  front line to artillery x gap: p50 ${gap.toFixed(2)}m ` +
+    `(floor ${CFG.gates.formationGapMin.toFixed(1)}m, n=${geometry.gaps.length})`);
   console.log(
-    `  일반 타깃 근접 점유: p95 ${occupancy.toFixed(0)}기 ` +
-    `(상한 ${CFG.gates.meleeOccupancyP95Max}기)`);
+    `  melee attackers on one unit: p95 ${occupancy.toFixed(0)} ` +
+    `(ceiling ${CFG.gates.meleeOccupancyP95Max})`);
   console.log(
-    `  동일 x±${CFG.gates.allyOverlapHalfWidth.toFixed(1)}m 아군 중첩: ` +
-    `p95 ${overlap.toFixed(0)}기 (상한 ${CFG.gates.allyOverlapP95Max}기)`);
+    `  allies stacked within x±${CFG.gates.allyOverlapHalfWidth.toFixed(1)}m: ` +
+    `p95 ${overlap.toFixed(0)} (ceiling ${CFG.gates.allyOverlapP95Max})`);
   console.log(
-    `  첫 교전 시각: p50 ${first.toFixed(2)}s / 기준 ${baseline.toFixed(2)}s / ` +
-    `변화 ${(change * 100).toFixed(1)}% ` +
-    `(허용 ±${Math.round(CFG.gates.firstEngagementTolerance * 100)}%)`);
+    `  first engagement: p50 ${first.toFixed(2)}s / baseline ${baseline.toFixed(2)}s / ` +
+    `change ${(change * 100).toFixed(1)}% ` +
+    `(allowed ±${Math.round(CFG.gates.firstEngagementTolerance * 100)}%)`);
   console.log(`  FORMATION_GATE=${pass ? 'PASS' : 'FAIL'}`);
 }
 
@@ -463,7 +468,7 @@ function quantile(values, q) {
 
 /** Isolate the split axis: identical design, only the member count differs. */
 function reportSplit() {
-  console.log('\n=== 분할 검증 (동일 설계를 1/2/3/5기로 복제, vs 강타 엘리트) ===');
+  console.log('\n=== Split check (one design as 1/2/3/5 bodies vs a crushing elite) ===');
   const base = stubInterpret('강철 창병', NEUTRAL);
   for (const n of [1, 2, 3, 5]) {
     const intent = { ...base, requestedCount: n, cohort: n === 1 ? 'elite' : n >= 5 ? 'swarm' : 'pack' };
@@ -484,17 +489,17 @@ function reportSplit() {
         if (B.wave >= 1 && (!mine.length || !th.length)) {
           if (mine.length) wins++;
           ok++;
-          console.log(`  ${n}기: 총HP${Math.round(bp.totalHp)} 오버킬 ${Math.round((B.stats.overkill / Math.max(1, B.stats.rawDamage)) * 100)}%` + (ok === 1 ? '' : ''));
+          console.log(`  x${n}: total HP ${Math.round(bp.totalHp)}, overkill ${Math.round((B.stats.overkill / Math.max(1, B.stats.rawDamage)) * 100)}%`);
           break;
         }
       }
     }
-    console.log(`  → ${n}기 승률 ${Math.round((wins / 6) * 100)}%  (분할세 ${CFG.cost.splitCost[n]}BP)`);
+    console.log(`  -> x${n} win rate ${Math.round((wins / 6) * 100)}%  (split cost ${CFG.cost.splitCost[n]} BP)`);
   }
 }
 
 function reportMatches() {
-  console.log('\n=== 사령관 풀매치 (좌우 교대, 조합당 8시드) ===');
+  console.log('\n=== Commander matches, bot vs bot (sides alternate, 8 seeds per pairing) ===');
   const demons = COMMANDERS.filter((c) => c.faction === 'demon').map((c) => c.id);
   const humans = COMMANDERS.filter((c) => c.faction === 'human').map((c) => c.id);
   const lens = [], all = [];
@@ -507,7 +512,7 @@ function reportMatches() {
         if (r.winner === d) dw++;
         n++;
       }
-      console.log(`  ${`${d} vs ${h}`.padEnd(26)} 마계 승률 ${String(Math.round((dw / n) * 100)).padStart(3)}%`);
+      console.log(`  ${`${d} vs ${h}`.padEnd(26)} demon win rate ${String(Math.round((dw / n) * 100)).padStart(3)}%`);
     }
   }
   lens.sort((a, b) => a - b);
@@ -523,42 +528,42 @@ function reportMatches() {
   const agingBeforeAttack = all.reduce((s, r) => s + r.agingBeforeAttack, 0);
   const activeEnemyHard = all.reduce((s, r) => s + r.activeEnemyHardDeaths, 0);
   const pooledAgeFrac = ageDeaths / Math.max(1, ageDeaths + combatDeaths);
-  console.log(`\n  경기 길이: p10 ${fmt(q(lens, .1))} / 중앙값 ${fmt(q(lens, .5))} / p90 ${fmt(q(lens, .9))}  (목표 중앙값 ${fmt(CFG.pacing.targetMedian)})`);
-  console.log(`  오버타임 전 정상 결착: ${Math.round(normal * 100)}%  (목표 ≥80%)`);
-  console.log(`  균열 붕괴 진입률: ${Math.round(otRate * 100)}%  (목표 ≤15%)`);
-  console.log(`  전선 교착(중앙±3m 6웨이브 이상): ${Math.round(stall * 100)}%  (목표 <25%)`);
-  console.log(`  노화 사망 비율: pooled ${Math.round(pooledAgeFrac * 100)}% / 경기별 평균 ${Math.round(ageFrac * 100)}%  (목표 <5%)`);
-  console.log(`    hard ${ageHard} · decay ${ageDecay} · 첫 공격 전 ${agingBeforeAttack} · 적진 교전중 hard ${activeEnemyHard} / 노화사 ${ageDeaths}`);
+  console.log(`\n  match length: p10 ${fmt(q(lens, .1))} / median ${fmt(q(lens, .5))} / p90 ${fmt(q(lens, .9))}  (target median ${fmt(CFG.pacing.targetMedian)})`);
+  console.log(`  decided before overtime: ${Math.round(normal * 100)}%  (target >= 80%)`);
+  console.log(`  reached overtime: ${Math.round(otRate * 100)}%  (target <= 15%)`);
+  console.log(`  stalled front (centre ±3 m for 6+ waves): ${Math.round(stall * 100)}%  (target < 25%)`);
+  console.log(`  deaths from old age: pooled ${Math.round(pooledAgeFrac * 100)}% / per-match mean ${Math.round(ageFrac * 100)}%  (target < 5%)`);
+  console.log(`    hard ${ageHard} · decay ${ageDecay} · before first attack ${agingBeforeAttack} · hard while fighting in enemy half ${activeEnemyHard} / all ${ageDeaths}`);
 }
 
 function reportDiagnosis() {
-  console.log('\n=== 습격자 열세 기여도 진단 (좌우 교대 6전, 잔존은 승자 자체 시작가치 기준) ===');
-  diagnosticRow('assassin→archer 기준', 'assassin', 'archer');
-  diagnosticRow('beast→archer 기준', 'beast', 'archer');
-  diagnosticRow('beast→golem 기준', 'beast', 'golem');
-  diagnosticRow('elite→archer 기준', 'elite', 'archer');
-  diagnosticRow('assassin: 레인 정렬 버그 복원', 'assassin', 'archer', {}, () =>
+  console.log('\n=== Why raiders lose: counterfactual duels (6 games, sides swapped; survival vs the winner\'s own starting value) ===');
+  diagnosticRow('assassin->archer baseline', 'assassin', 'archer');
+  diagnosticRow('beast->archer baseline', 'beast', 'archer');
+  diagnosticRow('beast->golem baseline', 'beast', 'golem');
+  diagnosticRow('elite->archer baseline', 'elite', 'archer');
+  diagnosticRow('assassin: old lane-sort bug', 'assassin', 'archer', {}, () =>
     withSetting(CFG.combat, 'meleeLaneHold', false));
-  diagnosticRow('beast: 레인 정렬 버그 복원', 'beast', 'archer', {}, () =>
+  diagnosticRow('beast: old lane-sort bug', 'beast', 'archer', {}, () =>
     withSetting(CFG.combat, 'meleeLaneHold', false));
-  diagnosticRow('assassin: 보루 제거', 'assassin', 'archer', { withStructures: false });
-  diagnosticRow('beast: 보루 제거', 'beast', 'archer', { withStructures: false });
+  diagnosticRow('assassin: no bastions', 'assassin', 'archer', { withStructures: false });
+  diagnosticRow('beast: no bastions', 'beast', 'archer', { withStructures: false });
 
-  diagnosticRow('assassin: 사거리 선공 제거', 'assassin', 'archer', {
+  diagnosticRow('assassin: no range first-shot', 'assassin', 'archer', {
     transformB: (bp) => ({ ...bp, range: CFG.cost.rangeBase }),
   });
-  diagnosticRow('beast: 레인거리 제거', 'beast', 'archer', {}, () =>
+  diagnosticRow('beast: no lane distance', 'beast', 'archer', {}, () =>
     withSetting(CFG.field, 'laneSpacing', 0));
-  diagnosticRow('beast: charge 제거', 'beast', 'archer', {
+  diagnosticRow('beast: no charge', 'beast', 'archer', {
     transformA: (bp) => ({ ...bp, skills: bp.skills.filter((s) => s !== 'charge') }),
   });
-  diagnosticRow('beast: HP로 12BP 이동', 'beast', 'archer', {
+  diagnosticRow('beast: 12 BP moved to HP', 'beast', 'archer', {
     transformA: (bp) => shiftDpsToHp(bp, 12),
   });
-  diagnosticRow('assassin: HP로 12BP 이동', 'assassin', 'archer', {
+  diagnosticRow('assassin: 12 BP moved to HP', 'assassin', 'archer', {
     transformA: (bp) => shiftDpsToHp(bp, 12),
   });
-  diagnosticRow('beast→golem: ward 제거', 'beast', 'golem', {
+  diagnosticRow('beast->golem: no ward', 'beast', 'golem', {
     transformB: (bp) => ({ ...bp, skills: bp.skills.filter((s) => s !== 'ward') }),
   });
 
@@ -566,8 +571,8 @@ function reportDiagnosis() {
   const oldArtillery = CFG.combat.engageWindupMul.artillery;
   CFG.combat.engageWindupMul.raider = 0.5;
   CFG.combat.engageWindupMul.artillery = 1.25;
-  diagnosticRow('assassin: 포격 준비 1.0s', 'assassin', 'archer');
-  diagnosticRow('beast: 포격 준비 1.0s', 'beast', 'archer');
+  diagnosticRow('assassin: artillery windup 1.0s', 'assassin', 'archer');
+  diagnosticRow('beast: artillery windup 1.0s', 'beast', 'archer');
   CFG.combat.engageWindupMul.raider = oldRaider;
   CFG.combat.engageWindupMul.artillery = oldArtillery;
 
@@ -618,14 +623,14 @@ function diagnosticRow(label, a, b, opts = {}, setting = null) {
   const noAttack = out.reduce((s, r) => s + r.aNoAttackDeaths, 0);
   const charges = out.reduce((s, r) => s + r.aCharges, 0) / out.length;
   console.log(
-    `  ${label.padEnd(29)} 승점${String(Math.round(score * 100)).padStart(3)}% ` +
-    `잔존${String(Math.round(median(out.map((r) => r.remainFrac)) * 100)).padStart(3)}% ` +
-    `선공차${median(out.map((r) => r.firstAttackGap)).toFixed(2).padStart(5)}s ` +
-    `첫타전피해${Math.round(median(out.map((r) => r.damageToABeforeFirstAttack))).toString().padStart(4)} ` +
-    `도착폭${median(out.map((r) => r.aArrivalSpread)).toFixed(2).padStart(5)}s ` +
-    `무공격사${String(noAttack).padStart(2)} ` +
-    `오버킬 A/B ${Math.round(aOverkill * 100)}/${Math.round(bOverkill * 100)}% ` +
-    `방벽흡수${Math.round(shield).toString().padStart(3)} 돌진${charges.toFixed(1)}`);
+    `  ${label.padEnd(32)} score${String(Math.round(score * 100)).padStart(4)}% ` +
+    `kept${String(Math.round(median(out.map((r) => r.remainFrac)) * 100)).padStart(4)}% ` +
+    `first-hit gap${median(out.map((r) => r.firstAttackGap)).toFixed(2).padStart(6)}s ` +
+    `dmg before own hit${Math.round(median(out.map((r) => r.damageToABeforeFirstAttack))).toString().padStart(5)} ` +
+    `arrival spread${median(out.map((r) => r.aArrivalSpread)).toFixed(2).padStart(6)}s ` +
+    `died unattacking${String(noAttack).padStart(3)} ` +
+    `overkill A/B ${Math.round(aOverkill * 100)}/${Math.round(bOverkill * 100)}% ` +
+    `ward absorbed${Math.round(shield).toString().padStart(4)} charges ${charges.toFixed(1)}`);
 }
 
 function shiftDpsToHp(bp, amountBp) {
@@ -646,9 +651,9 @@ function withSetting(obj, key, value) {
 // ---------------------------------------------------------------- main
 const mode = process.argv[2] ?? 'all';
 if (mode === 'duel') {
-  console.log('=== 단일 경기 상세 (루시퍼 vs 대장장이) ===');
+  console.log('=== One match, wave by wave (lucifer vs smith) ===');
   const r = fullMatch('lucifer', 'smith', 4242, true);
-  console.log(`\n결과: ${r.winner} 승 · ${fmt(r.t)} · ${r.waves}웨이브 · ${r.reason}`);
+  console.log(`\nresult: ${r.winner} wins · ${fmt(r.t)} · ${r.waves} waves · ${END_REASON[r.reason] ?? r.reason}`);
 } else if (mode === 'prompts') reportCompile();
 else if (mode === 'mirror') reportMirror();
 else if (mode === 'triangle') {
