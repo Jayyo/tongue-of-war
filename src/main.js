@@ -152,17 +152,18 @@ async function startBattle() {
   probeAi();
 }
 
-/** One health check tells the player whether they're facing a model or the stub. */
+/** One health check tells the player whether they're facing a model or the bot. */
 async function probeAi() {
+  const B = state.battle;
   try {
     const r = await fetch('/api/health').then((x) => x.json());
-    state.aiMode = r?.provider ? `${r.provider}` : 'stub';
-    logMsg(state.battle, 'sys', r?.provider
+    state.aiMode = r?.provider ? 'llm' : 'stub';
+    logMsg(B, 'sys', r?.provider
       ? `상대 사령관: ${r.provider} / ${r.model} 이 직접 주문을 쓴다`
       : '상대 사령관: LLM 키가 없어 내장 봇이 대신 둔다');
   } catch {
     state.aiMode = 'stub';
-    logMsg(state.battle, 'sys', '상대 사령관: 정적 서버로 실행 중 — 내장 봇이 대신 둔다');
+    logMsg(B, 'sys', '상대 사령관: 정적 서버로 실행 중 — 내장 봇이 대신 둔다');
   }
 }
 
@@ -489,54 +490,69 @@ function loop() {
 // ---------------------------------------------------------------- opponent
 let botModule = null;
 
+const FALLBACK_TAG = {
+  no_provider: '내장 봇', timeout: '내장 봇 · 응답 시간 초과',
+  rate_limited: '내장 봇 · 호출 제한', empty: '내장 봇 · 빈 응답', unaffordable: '내장 봇',
+};
+
 /**
  * Ask the model for a sentence; run it through the SAME pipeline the player uses.
- * Anything that goes wrong falls through to the scripted bot.
+ * Anything that goes wrong falls through to the scripted bot, and the quote box
+ * says which of the two actually wrote the line.
  */
 async function runOpponent(B) {
   const side = other(state.mySide);
   if (state.aiBusy) return;
-  state.aiBusy = true;
-  try {
-    const got = await askOpponent(B, side, DIFFICULTY[state.diff] ?? DIFFICULTY.duel);
-    if (got && !B.over) {
-      const p = player(B, side);
-      const intent = stubInterpret(got.sentence, p.commander);
-      const tierKey = p.essence >= CFG.ritual.tiers.greater.cost ? 'greater'
-        : p.essence >= CFG.ritual.tiers.standard.cost ? 'standard' : 'small';
-      const tier = CFG.ritual.tiers[tierKey];
-      const bp = compile(intent, tier.bp, p.commander);
-      // the AI's sentence goes through the SAME appearance path as the player's
-      bp.visual = interpretVisual(got.sentence, intent, p.commander);
-      if (queueContract(B, side, bp, tier.cost)) {
-        p.lastSentence = got.sentence;
-        p.lastSummonFx = B.t;
-        showFoeQuote(p, got, bp);
-        logMsg(B, sideKind(side), `상대 주문: "${got.sentence}"`);
-        return;
+  const diff = DIFFICULTY[state.diff] ?? DIFFICULTY.duel;
+  let reason = 'no_provider';
+  if (state.aiMode === 'llm') {
+    state.aiBusy = true;
+    try {
+      const got = await askOpponent(B, side, diff);
+      // A slow answer can land after the match ended or a new one started.
+      if (B !== state.battle || B.over) return;
+      if (got.sentence) {
+        const p = player(B, side);
+        const intent = stubInterpret(got.sentence, p.commander);
+        const tierKey = p.essence >= CFG.ritual.tiers.greater.cost ? 'greater'
+          : p.essence >= CFG.ritual.tiers.standard.cost ? 'standard' : 'small';
+        const tier = CFG.ritual.tiers[tierKey];
+        const bp = compile(intent, tier.bp, p.commander);
+        // the AI's sentence goes through the SAME appearance path as the player's
+        bp.visual = interpretVisual(got.sentence, intent, p.commander);
+        if (queueContract(B, side, bp, tier.cost)) {
+          p.lastSentence = got.sentence;
+          p.lastSummonFx = B.t;
+          showFoeQuote(p, got.sentence, got.cached ? `${got.provider} · 캐시` : `${got.provider} · ${got.ms}ms`, bp);
+          logMsg(B, sideKind(side), `상대 주문: "${got.sentence}"`);
+          return;
+        }
+        reason = 'unaffordable';
+      } else {
+        reason = got.reason ?? 'error';
       }
-    }
-  } catch { /* fall through */ }
-  finally { state.aiBusy = false; }
+    } finally { state.aiBusy = false; }
+  }
 
   if (!botModule) botModule = await import('./ai/bot.js');
-  const act = botModule.botThink(B, side);
+  if (B !== state.battle || B.over) return;
+  const act = botModule.botThink(B, side, diff);
   if (act?.kind === 'summon') {
     const p = player(B, side);
     p.lastSentence = act.prompt;
     p.lastSummonFx = B.t;
-    showFoeQuote(p, { sentence: act.prompt, provider: 'bot', cached: false, ms: 0 }, act.blueprint);
+    showFoeQuote(p, act.prompt, FALLBACK_TAG[reason] ?? '내장 봇 · 응답 실패', act.blueprint);
     logMsg(B, sideKind(side), `상대 주문: "${act.prompt}"`);
   } else if (act?.kind === 'upgrade') {
     logMsg(B, sideKind(side), `상대 교리: ${CFG.upgrades.doctrines[act.doctrine].label}`);
   }
 }
 
-function showFoeQuote(p, got, bp) {
+function showFoeQuote(p, sentence, tag, bp) {
   $('foe-quote').hidden = false;
   $('fq-who').textContent = p.commander.name;
-  $('fq-tag').textContent = got.provider === 'bot' ? '내장 봇' : (got.cached ? `${got.provider} · 캐시` : `${got.provider} · ${got.ms}ms`);
-  $('fq-text').textContent = got.sentence;
+  $('fq-tag').textContent = tag;
+  $('fq-text').textContent = sentence;
   $('fq-stat').innerHTML = bp
     ? `<span class="chip role-${bp.role}">${roleLabel(bp.role)}</span> ${bp.count}기 · HP ${Math.round(bp.totalHp)} · DPS ${Math.round(bp.totalDps)} · ${bp.channel === 'arcane' ? '비술' : '물리'}`
     : '';
