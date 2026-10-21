@@ -1,0 +1,23 @@
+Tongue of War (강령전쟁)
+Copyright (c) 2026 Jay Cho
+
+Code
+  Everything outside assets/ and docs/media/ is under the MIT License (LICENSE).
+
+Art: assets/ and docs/media/
+  Commander portraits, unit sprites, weapons, rig part sheets, structures and
+  backdrops were generated with OpenAI's gpt-image-2 image model from the prompts
+  in tools/gen-*.mjs, on a flat #00FF00 background. They were then keyed and
+  cropped (tools/cut-chroma.py), sliced into rig parts with pivots and mounts
+  (tools/slice-parts.py, tools/slice-siege.py, tools/slice-creature.py) and
+  converted to WebP (tools/webp.py). docs/media/ holds screenshots of the game
+  recorded with tools/record-demo.mjs.
+
+  The art is shared under Creative Commons Attribution 4.0 International
+  (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/).
+  Attribution: "Tongue of War art by Jay Cho".
+
+Third-party software
+  three.js (MIT) and Playwright (Apache-2.0, development only) are installed
+  from npm and are not included in this repository. The UI uses the Pretendard
+  font only if it is installed locally; no font files are distributed.

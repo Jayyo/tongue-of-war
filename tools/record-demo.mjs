@@ -4,7 +4,7 @@
 // renders, and the clip comes out smooth and repeatable.
 //
 //   npx playwright install chromium        (once; needs ffmpeg built with libwebp)
-//   node tools/record-demo.mjs             writes docs/media/{select,battle,demo}.webp
+//   node tools/record-demo.mjs             writes docs/media/{select,demo}.webp
 //
 // The opponent is whatever the server is configured with: set OPENAI_API_KEY (or
 // another provider) to film the LLM commander, leave it unset to film the bot.
@@ -71,6 +71,15 @@ const until = async (fn, ms = 20_000) => {
 
 try {
   fs.mkdirSync(OUT, { recursive: true });
+  // The select screen is shot on a normal page: CSS transitions do not advance
+  // while the fake clock is paused.
+  const plain = await browser.newPage({ viewport: VIEW, deviceScaleFactor: 1 });
+  await plain.goto(url, { waitUntil: 'networkidle' });
+  await plain.click('button.cmd-card[data-id=baal]');
+  await plain.waitForTimeout(800);
+  await plain.screenshot({ path: path.join(FRAMES, 'select.png') });
+  await plain.close();
+
   // install() alone lets fake time keep flowing with the wall clock; pausing it
   // means only runFor() moves the game.
   const t0 = Date.parse('2026-01-01T00:00:00Z');
@@ -78,9 +87,6 @@ try {
   await page.clock.pauseAt(t0 + 1000);
   await page.goto(url, { waitUntil: 'networkidle' });
   await page.click('button.cmd-card[data-id=baal]');
-  await page.clock.runFor(400);
-  await capture('select.png');
-
   await page.click('#btn-start');
   await type('앞을 막아서는 두꺼운 탱크 셋');              // "thick tanks x3 that hold the line"
   await page.click('#btn-summon');
@@ -92,7 +98,6 @@ try {
   await type('적 후열을 파고드는 날렵한 그림자 자객 셋');   // "swift shadow assassins x3 that dive the enemy back line"
   await page.click('#btn-summon');
   await play(4500);
-  await capture('battle.png');
 } finally {
   await browser.close();
   child.kill();
@@ -101,7 +106,6 @@ try {
 const still = (name) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(FRAMES, `${name}.png`),
   '-c:v', 'libwebp', '-quality', '86', path.join(OUT, `${name}.webp`)]);
 still('select');
-still('battle');
 // Animated WebP rather than GIF: at full width the HUD text stays readable and the
 // file is about half the size of a blurry 800 px GIF.
 execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(1000 / STEP), '-i', path.join(FRAMES, 'f%04d.png'),
