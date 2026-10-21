@@ -11,7 +11,7 @@ import {
   player, other, structOf, SIDE,
 } from '../src/engine/sim.js';
 import { compile } from '../src/domain/budget.js';
-import { stubInterpret } from '../src/gen/interpreter.js';
+import { parseIntent } from '../src/gen/interpreter.js';
 import { COMMANDERS, getCommander } from '../src/domain/commanders.js';
 import { botThink } from '../src/ai/bot.js';
 import { CFG } from '../src/config.js';
@@ -68,8 +68,8 @@ function cohortDuel(aPrompt, bPrompt, seed, swapSides = false, opts = {}) {
       else if (s.kind === 'core') s.hp = s.maxHp = Number.POSITIVE_INFINITY;
     }
   }
-  let bpA = compile(stubInterpret(aPrompt, NEUTRAL), 120, NEUTRAL);
-  let bpB = compile(stubInterpret(bPrompt, NEUTRAL), 120, NEUTRAL);
+  let bpA = compile(parseIntent(aPrompt, NEUTRAL), 120, NEUTRAL);
+  let bpB = compile(parseIntent(bPrompt, NEUTRAL), 120, NEUTRAL);
   if (opts.transformA) bpA = opts.transformA(cloneBlueprint(bpA));
   if (opts.transformB) bpB = opts.transformB(cloneBlueprint(bpB));
   B.players[0].essence = 9999; B.players[1].essence = 9999;
@@ -229,7 +229,7 @@ const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(
 function reportCompile() {
   console.log('\n=== Sentence -> blueprint (neutral commander, 120 BP) ===');
   for (const r of REFERENCE) {
-    const intent = stubInterpret(r.text, NEUTRAL);
+    const intent = parseIntent(r.text, NEUTRAL);
     const bp = compile(intent, 120, NEUTRAL);
     console.log(
       `${r.key.padEnd(9)} ${bp.role.padEnd(9)} x${bp.count} ` +
@@ -408,9 +408,9 @@ function sampleMixedFormation() {
   const occupancies = [];
   const overlaps = [];
   const blueprints = [
-    compile(stubInterpret(byKey.wall, NEUTRAL), 120, NEUTRAL),
-    compile(stubInterpret(byKey.assassin, NEUTRAL), 120, NEUTRAL),
-    compile(stubInterpret(byKey.archer, NEUTRAL), 120, NEUTRAL),
+    compile(parseIntent(byKey.wall, NEUTRAL), 120, NEUTRAL),
+    compile(parseIntent(byKey.assassin, NEUTRAL), 120, NEUTRAL),
+    compile(parseIntent(byKey.archer, NEUTRAL), 120, NEUTRAL),
   ];
 
   for (let seedIndex = 0; seedIndex < CFG.gates.formationSampleSeeds; seedIndex++) {
@@ -474,7 +474,7 @@ function quantile(values, q) {
 /** Isolate the split axis: identical design, only the member count differs. */
 function reportSplit() {
   console.log('\n=== Split check (one design as 1/2/3/5 bodies vs a crushing elite) ===');
-  const base = stubInterpret('강철 창병', NEUTRAL);
+  const base = parseIntent('강철 창병', NEUTRAL);
   for (const n of [1, 2, 3, 5]) {
     const intent = { ...base, requestedCount: n, cohort: n === 1 ? 'elite' : n >= 5 ? 'swarm' : 'pack' };
     const bp = compile(intent, 120, NEUTRAL);
@@ -482,7 +482,7 @@ function reportSplit() {
     for (let s = 0; s < 3; s++) for (const swap of [false, true]) {
       const B = createBattle({ seed: 500 + s * 91, players: [
         { side: SIDE.L, commander: NEUTRAL }, { side: SIDE.R, commander: NEUTRAL }]});
-      const foe = compile(stubInterpret(byKey.elite, NEUTRAL), 120, NEUTRAL);
+      const foe = compile(parseIntent(byKey.elite, NEUTRAL), 120, NEUTRAL);
       B.players[0].essence = 9999; B.players[1].essence = 9999;
       queueContract(B, swap ? SIDE.R : SIDE.L, bp, 0);
       queueContract(B, swap ? SIDE.L : SIDE.R, foe, 0);

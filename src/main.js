@@ -5,7 +5,7 @@
 import { COMMANDERS, getCommander } from './domain/commanders.js';
 import { compile } from './domain/budget.js';
 import { SKILLS } from './domain/skills.js';
-import { stubInterpret } from './gen/interpreter.js';
+import { parseIntent } from './gen/interpreter.js';
 import { interpretVisual, visualSummary } from './gen/visual.js';
 import { computeSignals, extractClaim, verifyClaim, echoMultiplier, suggestPrompts } from './domain/signals.js';
 import {
@@ -226,7 +226,7 @@ function planCast(B, side, text, tierKey, history) {
   const p = player(B, side);
   if (!text) return null;
 
-  const intent = stubInterpret(text, p.commander);
+  const intent = parseIntent(text, p.commander);
   const live = computeSignals(B, side);
   const claim = extractClaim(text);
   let verdict = verifyClaim(claim, live);

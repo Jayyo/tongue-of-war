@@ -7,7 +7,7 @@ import { buildSnapshot, DIFFICULTY } from '../src/ai/llm-opponent.js';
 import { createBattle, step, queueContract, SIDE } from '../src/engine/sim.js';
 import { getCommander } from '../src/domain/commanders.js';
 import { compile } from '../src/domain/budget.js';
-import { stubInterpret } from '../src/gen/interpreter.js';
+import { parseIntent } from '../src/gen/interpreter.js';
 
 function liveSnapshot(diff) {
   const B = createBattle({ seed: 3, players: [
@@ -15,7 +15,7 @@ function liveSnapshot(diff) {
     { side: SIDE.R, commander: getCommander('smith'), isBot: true },
   ] });
   const text = '적 후열을 파고드는 날렵한 그림자 자객 셋';
-  queueContract(B, SIDE.L, compile(stubInterpret(text, getCommander('lucifer')), 120, getCommander('lucifer')), 120);
+  queueContract(B, SIDE.L, compile(parseIntent(text, getCommander('lucifer')), 120, getCommander('lucifer')), 120);
   B.players[0].lastSentence = text;
   for (let i = 0; i < 600; i++) step(B, 0.05);
   return buildSnapshot(B, SIDE.R, diff);

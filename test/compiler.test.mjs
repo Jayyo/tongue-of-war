@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, costOf } from '../src/domain/budget.js';
-import { stubInterpret } from '../src/gen/interpreter.js';
+import { parseIntent } from '../src/gen/interpreter.js';
 import { COMMANDERS } from '../src/domain/commanders.js';
 import { SKILLS } from '../src/domain/skills.js';
 import { CFG } from '../src/config.js';
@@ -84,7 +84,7 @@ test('any sentence compiles to a legal unit', () => {
   fuzz(8000, 1234, (rng, pick, cmd) => {
     const parts = Array.from({ length: 1 + Math.floor(rng() * 7) }, () => (rng() < 0.75 ? pick(WORDS) : pick(NOISE)));
     const text = parts.join(rng() < 0.5 ? ' ' : '');
-    return { label: `sentence "${text}"`, intent: stubInterpret(text, cmd) };
+    return { label: `sentence "${text}"`, intent: parseIntent(text, cmd) };
   });
 });
 
@@ -110,6 +110,6 @@ test('a malformed intent still compiles to a legal unit', () => {
 
 test('regression: small artillery with two skills used to overspend', () => {
   const lucifer = COMMANDERS.find((c) => c.id === 'lucifer');
-  const bp = compile(stubInterpret('약제사 맹독 보초 산개 포격대 오직하나 방패를', lucifer), 80, lucifer);
+  const bp = compile(parseIntent('약제사 맹독 보초 산개 포격대 오직하나 방패를', lucifer), 80, lucifer);
   assert.deepEqual(violations(bp, 80, lucifer), []);
 });

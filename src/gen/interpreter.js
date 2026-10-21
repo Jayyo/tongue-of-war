@@ -61,7 +61,7 @@ const FORMS = LEXICON.flatMap((e) => e.w.map((w) => ({ w: w.replace(/\s+/g, ''),
  * @param {string} prompt
  * @param {import('../domain/commanders.js').Commander} commander
  */
-export function stubInterpret(prompt, commander) {
+export function parseIntent(prompt, commander) {
   const text = (prompt || '').trim();
   const { self, target } = splitClauses(text);
   const selfC = self.replace(/\s+/g, '');
@@ -180,15 +180,6 @@ function leftoverWords(self, consumed) {
     out.push(bare);
   }
   return out;
-}
-
-/**
- * Placeholder for the real model adapter. Kept so the call site never changes.
- * When wired, it must return the SAME closed UnitIntent shape plus sourceSpans —
- * it may widen synonym coverage but must never invent a new mechanical axis.
- */
-export async function llmInterpret(prompt, commander) {
-  return stubInterpret(prompt, commander);
 }
 
 // ---------------------------------------------------------------- naming

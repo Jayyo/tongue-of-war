@@ -4,7 +4,7 @@
 //   node tools/feel.mjs
 import { createBattle, step, queueContract, player, structOf, spawnCohort, SIDE, other } from '../src/engine/sim.js';
 import { compile } from '../src/domain/budget.js';
-import { stubInterpret } from '../src/gen/interpreter.js';
+import { parseIntent } from '../src/gen/interpreter.js';
 import { getCommander } from '../src/domain/commanders.js';
 import { botThink } from '../src/ai/bot.js';
 import { CFG } from '../src/config.js';
@@ -17,7 +17,7 @@ const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(
 // How long does a cohort standing on an undefended structure take to break it?
 function siegeTime(text, target) {
   const B = createBattle({ seed: 7, players: [{ side: SIDE.L, commander: N }, { side: SIDE.R, commander: N }] });
-  const bp = compile(stubInterpret(text, N), 120, N);
+  const bp = compile(parseIntent(text, N), 120, N);
   B.players[0].essence = 9999;
   spawnCohort(B, B.players[0], bp, 0);
   // remove the enemy bastion when we are timing the core, so we time one structure
@@ -87,7 +87,7 @@ console.log(`   losing core at 50%          median ${fmt(p(halves, .5))}  (${Mat
 console.log('\n=== 3. Attrition: cohort damage as members die ===');
 console.log(`   cohortDpsRetention = ${CFG.combat.cohortDpsRetention}  ·  woundedDpsBonus = ${CFG.combat.woundedDpsBonus}`);
 {
-  const bp = compile(stubInterpret('값싼 하급 군단 다섯, 수로 밀어붙인다', N), 120, N);
+  const bp = compile(parseIntent('값싼 하급 군단 다섯, 수로 밀어붙인다', N), 120, N);
   const per = bp.dps, n = bp.count;
   const ret = CFG.combat.cohortDpsRetention ?? 0;
   console.log(`   5-body cohort (DPS ${per.toFixed(0)} each, ${(per * n).toFixed(0)} total):`);

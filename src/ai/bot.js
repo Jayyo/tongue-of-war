@@ -1,10 +1,11 @@
 // @ts-check
-// Scripted opponent. Crucially it plays by the SAME rules as the player:
-// it writes prompts from a template list, runs them through the same stub
-// interpreter and the same BP compiler, and only reacts to blueprints that have
-// actually taken the field (one wave late).
+// Scripted opponent, used when no model is configured and by the balance harness.
+// It goes through the same sentence path as the player: it picks sentences from a
+// fixed book, runs them through the same parser and BP compiler (at list price: no
+// context discount, no repeat surcharge), and only reacts to units that have
+// actually taken the field.
 
-import { stubInterpret } from '../gen/interpreter.js';
+import { parseIntent } from '../gen/interpreter.js';
 import { compile } from '../domain/budget.js';
 import { CFG } from '../config.js';
 import { queueContract, player, other } from '../engine/sim.js';
@@ -63,7 +64,7 @@ export function botThink(B, side, level = {}) {
   const threat = summarizeThreat(B, other(side));
   let best = null;
   for (const entry of BOOK) {
-    const intent = stubInterpret(entry.text, p.commander);
+    const intent = parseIntent(entry.text, p.commander);
     const bp = compile(intent, tierCfg.bp, p.commander);
     const score =
       counterScore(bp, threat) * 0.55 +

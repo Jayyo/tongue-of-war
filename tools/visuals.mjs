@@ -4,7 +4,7 @@
 // Gate 1 (semantic):  distinct sentences must produce distinct visual signatures
 // Gate 2 (isolation):  appearance-only words must not move a single BP number
 // Gate 3 (honesty):    a concept whose rig does not exist must report fallback
-import { stubInterpret } from '../src/gen/interpreter.js';
+import { parseIntent } from '../src/gen/interpreter.js';
 import { interpretVisual, visualSummary } from '../src/gen/visual.js';
 import { compile } from '../src/domain/budget.js';
 import { VISUAL_LEXICON, RIG_READY } from '../src/gen/visual-lexicon.js';
@@ -21,7 +21,7 @@ const CASES = [
 let rows = 0, distinct = new Set(), fallbacks = 0;
 console.log('\n=== Sentence -> appearance (VisualIntent) ===');
 for (const text of CASES) {
-  const ui = stubInterpret(text, NEUTRAL);
+  const ui = parseIntent(text, NEUTRAL);
   const v = interpretVisual(text, ui, NEUTRAL);
   distinct.add(v.signature);
   if (v.fallback.used) fallbacks++;
@@ -43,8 +43,8 @@ const PAIRS = [
 ];
 let leaks = 0;
 for (const [a, b] of PAIRS) {
-  const bpA = compile(stubInterpret(a, NEUTRAL), 120, NEUTRAL);
-  const bpB = compile(stubInterpret(b, NEUTRAL), 120, NEUTRAL);
+  const bpA = compile(parseIntent(a, NEUTRAL), 120, NEUTRAL);
+  const bpB = compile(parseIntent(b, NEUTRAL), 120, NEUTRAL);
   const keys = ['role', 'count', 'totalHp', 'totalDps', 'range', 'speed', 'channel'];
   const diff = keys.filter((k) => String(bpA[k]) !== String(bpB[k]));
   const known = b !== a && diff.length > 0;

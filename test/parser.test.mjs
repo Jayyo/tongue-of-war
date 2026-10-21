@@ -3,7 +3,7 @@
 // were fixed once and must not come back.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stubInterpret as parse } from '../src/gen/interpreter.js';
+import { parseIntent as parse } from '../src/gen/interpreter.js';
 import { compile } from '../src/domain/budget.js';
 
 const NEUTRAL = { id: 'neutral', faction: 'demon', name: 'neutral', bias: {}, mechanic: { id: 'none' } };

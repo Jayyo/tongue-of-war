@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBattle, step, queueContract, SIDE, structOf } from '../src/engine/sim.js';
 import { compile } from '../src/domain/budget.js';
-import { stubInterpret } from '../src/gen/interpreter.js';
+import { parseIntent } from '../src/gen/interpreter.js';
 import { getCommander } from '../src/domain/commanders.js';
 import { botThink } from '../src/ai/bot.js';
 
@@ -42,7 +42,7 @@ function mirror(text, seed) {
   }
   for (const side of [SIDE.L, SIDE.R]) {
     B.players[side].essence = 9999;
-    queueContract(B, side, compile(stubInterpret(text, NEUTRAL), 120, NEUTRAL), 0);
+    queueContract(B, side, compile(parseIntent(text, NEUTRAL), 120, NEUTRAL), 0);
   }
   const alive = (side) => B.units.some((u) => u.side === side && u.hp > 0);
   for (let i = 0; i < 20 * 60; i++) {

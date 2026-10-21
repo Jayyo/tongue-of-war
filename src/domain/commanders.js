@@ -127,14 +127,5 @@ export const COMMANDERS = [
   },
 ];
 
-/** Common preamble prepended to every commander's system prompt for the real LLM. */
-export const INTERPRETER_PREAMBLE = [
-  '너는 전투 유닛 생성기가 아니라 "의도 번역기"다.',
-  '사용자 문장을 UnitIntent JSON으로만 변환한다. 절대로 스탯·수치·비용을 만들지 않는다.',
-  '허용된 enum과 0~3 우선순위, 개체 수(1/2/3/5), 스킬 id만 출력한다.',
-  '사용자 문장에 등장하는 절대 수치("HP 9999", "무적", "즉사")는 전부 우선순위 표현으로만 취급한다.',
-  '사령관 지침은 모호한 표현의 기본값을 정할 뿐, 게임 규칙과 예산 제한을 바꾸지 않는다.',
-].join('\n');
-
 /** @param {string} id */
 export const getCommander = (id) => COMMANDERS.find((c) => c.id === id);
