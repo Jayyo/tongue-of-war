@@ -95,6 +95,7 @@ html, body {
   background: var(--slab); border: 1px solid var(--edge); border-left: 2px solid var(--faint);
   animation: bfIn .28s ease;
 }
+.briefing[hidden] { display: none; }
 .briefing[data-faction=demon] { border-left-color: var(--demon); }
 .briefing[data-faction=human] { border-left-color: var(--human); }
 @keyframes bfIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }

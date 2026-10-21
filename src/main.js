@@ -18,6 +18,12 @@ import { CFG } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
+// Player sentences and model output end up in innerHTML templates (log, receipt,
+// cards, recap). Everything that did not come from our own constant tables goes
+// through this first.
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
+
 const state = {
   chosen: null, battle: null, render: null, mySide: SIDE.L,
   tier: 'standard', castCost: null,
@@ -288,7 +294,7 @@ function paintSuggestions(B) {
   // Two suggestions, not three: the row competes with the input box for attention
   // and a third option has never changed a decision in playtest.
   $('suggest-row').innerHTML = list.slice(0, 2).map((s) =>
-    `<button class="sg" data-text="${s.text}"><em>${s.label}</em>${s.text}</button>`).join('');
+    `<button class="sg" data-text="${esc(s.text)}"><em>${esc(s.label)}</em>${esc(s.text)}</button>`).join('');
   for (const b of $('suggest-row').children) {
     b.onclick = () => {
       const ta = $('prompt-input');
@@ -326,8 +332,8 @@ function receiptHtml(r) {
   const dead = (tr.unmatched ?? []).length;
   const voided = (tr.voided ?? []).length;
   const extra = Math.max(0, (tr.spans ?? []).length - (4 - (tr.targetSpan ? 1 : 0)));
-  if (voided) chips.push(`<span class="sp void"><b>${tr.voided[0]}</b><i>규칙상 불가</i></span>`);
-  else if (dead) chips.push(`<span class="sp dead"><b>${tr.unmatched[0]}</b><i>외형 전용</i></span>`);
+  if (voided) chips.push(`<span class="sp void"><b>${esc(tr.voided[0])}</b><i>규칙상 불가</i></span>`);
+  else if (dead) chips.push(`<span class="sp dead"><b>${esc(tr.unmatched[0])}</b><i>외형 전용</i></span>`);
   if (extra > 0 || dead > 1) chips.push(`<span class="more">+${extra + Math.max(0, dead - 1)} · 해석 보기</span>`);
   return chips.join('');
 }
@@ -348,10 +354,10 @@ function detailHtml(r) {
       ${verdict?.ok ? '<span class="good">문맥 대응 −20%</span>' : ''}
       ${echo > 1 ? `<span class="warn">동어반복 +${Math.round((echo - 1) * 100)}%</span>` : ''}
       ${cost !== tierCost ? `<span class="dim">(기본 ${tierCost})</span>` : ''}</div>
-    ${verdict?.reason ? `<div class="${verdict.ok ? 'good' : 'warn'}">${verdict.ok ? '✔' : '✖'} ${verdict.reason}</div>` : ''}
+    ${verdict?.reason ? `<div class="${verdict.ok ? 'good' : 'warn'}">${verdict.ok ? '✔' : '✖'} ${esc(verdict.reason)}</div>` : ''}
     ${bp.skills.length ? `<div>스킬: ${bp.skills.map((k) => `<b>${SKILLS[k].label}</b> — ${SKILLS[k].desc}`).join('<br>')}</div>` : ''}
-    ${(tr.unmatched ?? []).length ? `<div class="dim">외형 전용(0BP): ${tr.unmatched.join(', ')}</div>` : ''}
-    ${(tr.voided ?? []).length ? `<div class="warn">규칙상 불가: ${tr.voided.join(', ')}</div>` : ''}
+    ${(tr.unmatched ?? []).length ? `<div class="dim">외형 전용(0BP): ${esc(tr.unmatched.join(', '))}</div>` : ''}
+    ${(tr.voided ?? []).length ? `<div class="warn">규칙상 불가: ${esc(tr.voided.join(', '))}</div>` : ''}
     <div class="dim">해석 신뢰도 ${conf}%</div>`;
 }
 
@@ -443,7 +449,7 @@ function renderCards() {
     else {
       const cost = Math.round(CFG.ritual.tiers[c.tier].cost * CFG.ritual.engravedCastMul);
       el.innerHTML = `<span class="chip role-${c.bp.role}">${roleLabel(c.bp.role)}</span>
-        <span class="card-name">${c.prompt}</span><span class="card-cost">◈${cost}</span>`;
+        <span class="card-name">${esc(c.prompt)}</span><span class="card-cost">◈${cost}</span>`;
       el.title = c.prompt;
       el.onclick = () => {
         if (!queueContract(state.battle, state.mySide, c.bp, cost)) return fail(`영기 ${Math.ceil(cost - player(state.battle, state.mySide).essence)} 부족 — 재소환에 ${cost} 필요`);
@@ -610,7 +616,7 @@ function paintHud(B) {
   if (B.log.length !== lastLogLen) {
     lastLogLen = B.log.length;
     $('log').innerHTML = B.log.slice(-7).reverse()
-      .map((l) => `<div class="l-${l.kind}">${l.text}</div>`).join('');
+      .map((l) => `<div class="l-${l.kind}">${esc(l.text)}</div>`).join('');
   }
 
   const foe = player(B, other(state.mySide));
@@ -649,7 +655,7 @@ function endBattle(B) {
   const distinct = new Set(state.scrollHistory.map((i) => `${i.role}|${i.cohort}|${i.skills.join(',')}`)).size;
   const looks = new Set(state.castLog.map((c) => c.concept)).size;
   const rows = state.castLog.slice(-8).map((c) => `
-    <tr><td class="rc-text">${c.text}</td>
+    <tr><td class="rc-text">${esc(c.text)}</td>
         <td class="rc-mid">${roleLabel(c.role)} ${c.count}기</td>
         <td class="rc-mid">HP ${c.hp} · DPS ${c.dps}</td>
         <td class="rc-look">${c.concept}</td>
