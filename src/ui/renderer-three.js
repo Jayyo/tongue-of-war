@@ -604,12 +604,16 @@ export function makeRenderer(canvas) {
     }
 
     // retire views for dead units
+    let rigged = 0;
     for (const [id, v] of unitViews) {
-      if (v.seen === frameTag) continue;
+      if (v.seen === frameTag) { if (v.rig) rigged++; continue; }
       scene.remove(v.group);
       v.mat.dispose();
       unitViews.delete(id);
     }
+    // How many live units are drawn with their rig; read by tools/smoke.mjs.
+    if (canvas.dataset.units !== String(unitViews.size)) canvas.dataset.units = String(unitViews.size);
+    if (canvas.dataset.rigged !== String(rigged)) canvas.dataset.rigged = String(rigged);
 
     // ---- fx
     for (const m of shotPool) m.visible = false;
