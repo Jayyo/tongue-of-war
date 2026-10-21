@@ -30,8 +30,12 @@ const BOOK = [
 /**
  * @param {any} B battle
  * @param {number} side
+ * @param {{botJitter?:number, tiers?:string[]|null}} [level] difficulty from
+ *   src/ai/opponent-prompt.js. Novice scores its options with heavy noise and
+ *   keeps to the smaller rituals; the default is the duel setting.
  */
-export function botThink(B, side) {
+export function botThink(B, side, level = {}) {
+  const jitter = level.botJitter ?? 0.06;
   const p = player(B, side);
   const foe = player(B, other(side));
 
@@ -48,7 +52,9 @@ export function botThink(B, side) {
   }
 
   // 2. pick a tier it can afford, biggest first
-  const tiers = Object.entries(CFG.ritual.tiers).sort((a, b) => b[1].bp - a[1].bp);
+  const tiers = Object.entries(CFG.ritual.tiers)
+    .filter(([k]) => !level.tiers || level.tiers.includes(k))
+    .sort((a, b) => b[1].bp - a[1].bp);
   const affordable = tiers.find(([, t]) => p.essence >= t.cost);
   if (!affordable) return null;
   const [, tierCfg] = affordable;
@@ -63,7 +69,7 @@ export function botThink(B, side) {
       counterScore(bp, threat) * 0.55 +
       compositionNeed(bp, p) * 0.25 +
       pressureScore(bp, B, side) * 0.20 +
-      B.rng() * 0.06;                       // small jitter so it isn't robotic
+      B.rng() * jitter;                     // jitter so it isn't robotic
     if (!best || score > best.score) best = { score, bp, text: entry.text };
   }
   if (!best) return null;
@@ -71,7 +77,7 @@ export function botThink(B, side) {
   // same appearance path as the player and the LLM opponent — the scripted bot must
   // not be the one unit family that renders differently
   best.bp.visual = interpretVisual(best.text, best.bp, p.commander);
-  queueContract(B, side, best.bp, tierCfg.cost);
+  if (!queueContract(B, side, best.bp, tierCfg.cost)) return null;
   return { kind: 'summon', blueprint: best.bp, prompt: best.text };
 }
 
