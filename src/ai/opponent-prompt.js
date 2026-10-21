@@ -2,8 +2,8 @@
 // Prompt side of the LLM commander, shared by the browser and the server.
 //
 // The browser only ever sends a battlefield SNAPSHOT. The server validates it with
-// readSnapshot() and builds the prompt here, so /api/opponent cannot be used to run
-// arbitrary prompts on the server's API key. Pure functions, no DOM, no fetch.
+// readSnapshot() and builds the prompt here, so the prompt that reaches the model is
+// fixed apart from one short, sanitized sentence. Pure functions, no DOM, no fetch.
 
 import { getCommander } from '../domain/commanders.js';
 import { SIGNAL_DEFS } from '../domain/signals.js';
@@ -70,8 +70,8 @@ export function buildUserPrompt(snap) {
 }
 
 /**
- * Quantised cache key: same tactical situation reuses the same sentence.
- * Without this a 6-minute match is ~30 live calls; with it, a handful.
+ * Quantised cache key: a repeated tactical situation reuses its sentence instead of
+ * calling the model again.
  * @param {string} commanderId @param {Snapshot} snap @param {string} difficulty
  */
 export function cacheKeyOf(commanderId, snap, difficulty) {

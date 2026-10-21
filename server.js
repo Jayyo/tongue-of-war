@@ -161,8 +161,8 @@ async function askModel(sys, user) {
 }
 
 // ---------------------------------------------------------------- cache + rate limit
-// Same quantised situation -> same sentence. Keeps a 6-minute match to a handful
-// of real calls and makes repeat play feel consistent.
+// Same quantised situation -> same sentence: saves calls when a situation repeats
+// and makes repeat play feel consistent.
 const cache = new Map();
 const CACHE_MAX = 500;
 const recent = new Map();   // client address -> timestamps of upstream calls
@@ -237,6 +237,10 @@ function serveStatic(pathname, res) {
       'Content-Type': MIME[path.extname(file)] ?? 'application/octet-stream',
       'Cache-Control': 'no-store',   // local dev server: never serve a stale module
       'X-Content-Type-Options': 'nosniff',
+      // No framing: a page elsewhere must not be able to wrap the game and click
+      // through matches on the player's key.
+      'Content-Security-Policy': "frame-ancestors 'none'",
+      'X-Frame-Options': 'DENY',
     });
     res.end(data);
   });

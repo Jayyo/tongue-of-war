@@ -157,8 +157,8 @@ structure HP, revealed cohorts, live signals and the human's last summoned sente
 the human's essence or unsent text. The server validates the snapshot field by field and
 builds the prompt itself (`src/ai/opponent-prompt.js`); the only free text that reaches
 the model is that last sentence, cut to 80 characters of Korean. The API also refuses
-other origins and non-JSON requests, so a web page elsewhere cannot spend the key through
-the player's browser. Answers are cached per quantized situation, so a repeated situation
+other origins and non-JSON requests and the page refuses to be framed, so another web page
+cannot quietly spend the key through the player's browser. Answers are cached per quantized situation, so a repeated situation
 reuses its sentence instead of calling the model again. Any failure (no key, timeout,
 empty answer, rate limit) falls back to the scripted bot, and the quote box says which
 one wrote the line.

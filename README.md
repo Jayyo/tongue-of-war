@@ -193,7 +193,7 @@ share one costume and palette. The art is CC BY 4.0; see [NOTICE](NOTICE).
   to the role's silhouette, marked with △.
 - Single player against the AI, desktop only. No online play, replay viewer or sound.
 - The server is meant for local play. It binds to 127.0.0.1, accepts API calls only from
-  its own page, builds every prompt itself (the only free text it forwards is your last
+  its own (unframeable) page, builds every prompt itself (the only free text it forwards is your last
   sentence, cut to 80 characters of Korean) and rate-limits model calls. Still, if you
   expose it with a key configured, anyone who can reach it spends your key.
 
