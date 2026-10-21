@@ -68,11 +68,12 @@ async function openingAsLucifer(page, url) {
   await page.click('#btn-summon');
   // the first opponent turn comes at the 12 s wave edge
   await page.waitForFunction(() => !document.querySelector('#foe-quote').hidden, null, { timeout: 25_000 });
-  // every live unit, both sides, should be assembled from its part sheet by now
+  // Our three tanks plus at least one opponent unit, every one of them assembled from
+  // its part sheet. The opponent's cohort lands 0.6 s after its quote appears.
   await page.waitForFunction(() => {
     const c = document.querySelector('#field').dataset;
-    return Number(c.units) >= 3 && c.units === c.rigged;
-  }, null, { timeout: 8_000 }).catch(() => problems.push('some units are still drawn as flat sprites'));
+    return Number(c.units) >= 4 && c.units === c.rigged;
+  }, null, { timeout: 8_000 }).catch(() => problems.push('opponent never landed, or some units are still flat sprites'));
 
   const out = await page.evaluate(() => ({
     clock: document.querySelector('#clock').textContent,
@@ -84,6 +85,7 @@ async function openingAsLucifer(page, url) {
   }));
   console.log(JSON.stringify(out, null, 2));
 
+  await page.close();
   if (!out.receipt.includes('탱크')) problems.push('receipt did not show the parsed noun');
   if (!out.log.some((l) => l.includes('출전'))) problems.push('no cohort entered the field');
   if (useMock) {
@@ -118,10 +120,15 @@ async function transmuteAsAlchemist(page, url) {
   const card = page.locator('#card-slots .card:not(.empty)');
   const before = await card.getAttribute('title');
   await page.click('#btn-transmute');
+  const essenceBefore = Number(await page.textContent('#res-p2'));
   await card.click();
+  // the HUD (log and essence) repaints on the next animation frame
+  await page.waitForFunction(() => document.querySelector('#log').textContent.includes('전투 연성'));
+  const essenceAfter = Number(await page.textContent('#res-p2'));
   const after = await card.getAttribute('title');
-  console.log(`transmute: ${before} -> ${after}`);
+  console.log(`transmute: ${before} -> ${after}, essence ${essenceBefore} -> ${essenceAfter}`);
   if (!before?.endsWith('(물리)') || !after?.endsWith('(비술)')) problems.push('transmute did not flip the engraved card to arcane');
+  if (!(essenceBefore - essenceAfter >= 20)) problems.push('transmute did not charge its cost');
 }
 
 const env = { ...process.env, PORT: '0', HOST: '127.0.0.1' };
@@ -140,9 +147,10 @@ try {
 } catch (e) {
   problems.push(String(e?.message ?? e));
 } finally {
-  await browser?.close();
-  server?.child.kill();
-  mock?.close();
+  try { await browser?.close(); } finally {
+    server?.child.kill();
+    mock?.close();
+  }
 }
 for (const p of problems) console.error(`FAIL ${p}`);
 console.log(problems.length ? 'smoke: failed' : 'smoke: ok');

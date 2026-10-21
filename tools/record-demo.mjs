@@ -108,17 +108,18 @@ try {
   server = await startServer();
   browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   await record(browser, server.url);
-} finally {
-  await browser?.close();
-  server?.child.kill();
-}
+  try { await browser.close(); } finally { server.child.kill(); }
 
-execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(FRAMES, 'select.png'),
-  '-c:v', 'libwebp', '-quality', '86', path.join(OUT, 'select.webp')]);
-// Animated WebP rather than GIF: at full width the HUD text stays readable and the
-// file is about half the size of a blurry 800 px GIF.
-execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(1000 / STEP), '-i', path.join(FRAMES, 'f%04d.png'),
-  '-c:v', 'libwebp_anim', '-quality', '75', '-compression_level', '6', '-loop', '0', path.join(OUT, 'demo.webp')]);
-if (process.env.KEEP_FRAMES) console.log(`frames kept in ${FRAMES}`);
-else fs.rmSync(FRAMES, { recursive: true, force: true });
-for (const f of fs.readdirSync(OUT)) console.log(`${f}  ${(fs.statSync(path.join(OUT, f)).size / 1e6).toFixed(2)} MB`);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(FRAMES, 'select.png'),
+    '-c:v', 'libwebp', '-quality', '86', path.join(OUT, 'select.webp')]);
+  // Animated WebP rather than GIF: at full width the HUD text stays readable and the
+  // file is about half the size of a blurry 800 px GIF.
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(1000 / STEP), '-i', path.join(FRAMES, 'f%04d.png'),
+    '-c:v', 'libwebp_anim', '-quality', '75', '-compression_level', '6', '-loop', '0', path.join(OUT, 'demo.webp')]);
+  for (const f of fs.readdirSync(OUT)) console.log(`${f}  ${(fs.statSync(path.join(OUT, f)).size / 1e6).toFixed(2)} MB`);
+} finally {
+  try { await browser?.close(); } catch { /* already closed */ }
+  server?.child.kill();
+  if (process.env.KEEP_FRAMES) console.log(`frames kept in ${FRAMES}`);
+  else fs.rmSync(FRAMES, { recursive: true, force: true });
+}
