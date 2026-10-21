@@ -6,6 +6,7 @@
 // arbitrary prompts on the server's API key. Pure functions, no DOM, no fetch.
 
 import { getCommander } from '../domain/commanders.js';
+import { SIGNAL_DEFS } from '../domain/signals.js';
 
 /**
  * Difficulty is tuned by INFORMATION RESOLUTION, not by model tier.
@@ -81,6 +82,9 @@ export function cacheKeyOf(commanderId, snap, difficulty) {
     bucket(snap.myCore), bucket(snap.enemyCore),
     (snap.enemyField.join(',') || 'none'),
     (snap.signals.join(',') || 'none'),
+    // The human's sentence is part of the prompt, so it must be part of the key:
+    // otherwise one player's text could decide another player's cached answer.
+    snap.enemyLastSentence ?? '',
   ].join('|');
 }
 
@@ -114,12 +118,14 @@ export function sanitizeSentence(text) {
 export const FRONTLINES = ['내가 밀고 있다', '내가 밀리고 있다', '중앙 교착'];
 const PCT = /^\d{1,3}%$/;
 const GROUP = /^(수호자|습격자|포격수)(×\d{1,2}|\((적음|보통|많음)\))(\(광역\))?(\(비술\))?$/;
-const SIGNAL = /^[가-힣 ]{2,10}( \d{1,3}%)?$/;
+const SIGNAL = new RegExp(`^(${Object.values(SIGNAL_DEFS).map((d) => d.label).join('|')})( \\d{1,3}%)?$`);
 
 /**
  * Validate a client snapshot field by field. Anything that does not look exactly
- * like what buildSnapshot() produces is rejected, which keeps the only free text
- * (the human's last sentence) short and single-line.
+ * like what buildSnapshot() produces is rejected. The only free text is the
+ * human's last sentence; it is cut to 80 characters of Hangul, digits, spaces and
+ * basic punctuation. That still lets a player talk to the model (it is their own
+ * opponent), but not hand it a long or structured prompt.
  * @returns {{ok:true, commanderId:string, difficulty:string, snap:Snapshot} | {ok:false, error:string}}
  */
 export function readSnapshot(body) {
@@ -144,7 +150,7 @@ export function readSnapshot(body) {
   let last = null;
   if (s.enemyLastSentence != null) {
     if (typeof s.enemyLastSentence !== 'string') return fail('enemyLastSentence');
-    last = s.enemyLastSentence.replace(/[\u0000-\u001f\u007f"]/g, ' ').trim().slice(0, 80) || null;
+    last = s.enemyLastSentence.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ0-9 ,.!?~·-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || null;
   }
   return {
     ok: true, commanderId, difficulty,

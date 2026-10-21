@@ -23,13 +23,17 @@ import {
 import { getCommander } from './src/domain/commanders.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-try { process.loadEnvFile(path.join(ROOT, '.env')); } catch { /* no .env: fine */ }
+// --no-dotenv keeps tests from picking up a developer's real keys.
+if (!process.argv.includes('--no-dotenv')) {
+  try { process.loadEnvFile(path.join(ROOT, '.env')); } catch { /* no .env: fine */ }
+}
 
 const PORT = Number(process.env.PORT ?? 8123);
 const HOST = process.env.HOST ?? '127.0.0.1';
 const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS ?? 9000);
 const MAX_OUTPUT_TOKENS = 600;   // a sentence is ~30 tokens; the rest is headroom for reasoning models
 const RATE_PER_MINUTE = 12;      // upstream calls per client address; one wave is 12 s
+const LOOPBACK = ['127.0.0.1', 'localhost', '::1'].includes(HOST);
 
 // ---------------------------------------------------------------- providers
 /**
@@ -176,6 +180,11 @@ function allowCall(addr) {
 // ---------------------------------------------------------------- routes
 async function handleOpponent(req, res) {
   if (!provider) return send(res, 200, { ok: false, error: 'no_provider' });
+  // JSON only: a cross-site page cannot send this without a CORS preflight, which
+  // this server never approves.
+  if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) {
+    return send(res, 415, { ok: false, error: 'json_only' });
+  }
   const body = await readJson(req, 16_384);
   if (body === undefined) {
     res.setHeader('Connection', 'close');
@@ -236,6 +245,7 @@ function serveStatic(pathname, res) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? '/', 'http://localhost');
+    if (url.pathname.startsWith('/api/') && !sameSite(req)) return send(res, 403, { error: 'forbidden' });
     if (url.pathname === '/api/opponent' && req.method === 'POST') return await handleOpponent(req, res);
     if (url.pathname === '/api/health') return handleHealth(req, res);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'method not allowed' });
@@ -246,19 +256,35 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+/**
+ * The API is for the page this server serves. Reject other origins, and while
+ * bound to loopback also reject unexpected Host headers (DNS rebinding).
+ */
+function sameSite(req) {
+  const host = req.headers.host ?? '';
+  if (LOOPBACK && !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host)) return false;
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try { return new URL(origin).host === host; } catch { return false; }
+}
+
 /** Resolves to the parsed body, null for invalid JSON, undefined if it is too large. */
 function readJson(req, limit) {
   return new Promise((resolve) => {
-    if (Number(req.headers['content-length'] ?? 0) > limit) return resolve(undefined);
-    let b = '';
+    if (Number(req.headers['content-length'] ?? 0) > limit) { req.resume(); return resolve(undefined); }
+    const chunks = [];
+    let size = 0;
     let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
     req.on('data', (c) => {
       if (done) return;
-      b += c;
-      if (b.length > limit) { done = true; resolve(undefined); req.destroy(); }
+      size += c.length;
+      if (size > limit) finish(undefined);     // keep draining; the 413 closes the connection
+      else chunks.push(c);
     });
-    req.on('end', () => { if (!done) { done = true; try { resolve(JSON.parse(b)); } catch { resolve(null); } } });
-    req.on('error', () => { if (!done) { done = true; resolve(null); } });
+    // Decode once at the end: a multi-byte Hangul character can straddle two chunks.
+    req.on('end', () => { try { finish(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { finish(null); } });
+    req.on('error', () => finish(null));
   });
 }
 
