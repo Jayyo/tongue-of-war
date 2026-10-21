@@ -1,0 +1,126 @@
+{
+  "unit": "human-raider",
+  "parts": {
+    "head": {
+      "file": "head.webp",
+      "w": 181,
+      "h": 276,
+      "parent": "torso",
+      "pivot": [
+        0.44,
+        0.86
+      ],
+      "z": 3
+    },
+    "torso": {
+      "file": "torso.webp",
+      "w": 132,
+      "h": 263,
+      "parent": "pelvis",
+      "pivot": [
+        0.5,
+        0.94
+      ],
+      "z": 2
+    },
+    "pelvis": {
+      "file": "pelvis.webp",
+      "w": 143,
+      "h": 188,
+      "parent": null,
+      "pivot": [
+        0.5,
+        0.35
+      ],
+      "z": 1
+    },
+    "frontUpper": {
+      "file": "frontUpper.webp",
+      "w": 70,
+      "h": 234,
+      "parent": "torso",
+      "pivot": [
+        0.5,
+        0.1
+      ],
+      "z": 5
+    },
+    "frontFore": {
+      "file": "frontFore.webp",
+      "w": 80,
+      "h": 314,
+      "parent": "frontUpper",
+      "pivot": [
+        0.5,
+        0.08
+      ],
+      "z": 6
+    },
+    "backUpper": {
+      "file": "backUpper.webp",
+      "w": 81,
+      "h": 313,
+      "parent": "torso",
+      "pivot": [
+        0.5,
+        0.1
+      ],
+      "z": -2
+    },
+    "backFore": {
+      "file": "backFore.webp",
+      "w": 76,
+      "h": 311,
+      "parent": "backUpper",
+      "pivot": [
+        0.5,
+        0.08
+      ],
+      "z": -1
+    },
+    "frontThigh": {
+      "file": "frontThigh.webp",
+      "w": 98,
+      "h": 276,
+      "parent": "pelvis",
+      "pivot": [
+        0.5,
+        0.08
+      ],
+      "z": 4
+    },
+    "frontShin": {
+      "file": "frontShin.webp",
+      "w": 99,
+      "h": 255,
+      "parent": "frontThigh",
+      "pivot": [
+        0.5,
+        0.06
+      ],
+      "z": 4
+    },
+    "backThigh": {
+      "file": "backThigh.webp",
+      "w": 74,
+      "h": 257,
+      "parent": "pelvis",
+      "pivot": [
+        0.5,
+        0.08
+      ],
+      "z": -3
+    },
+    "backShin": {
+      "file": "backShin.webp",
+      "w": 104,
+      "h": 255,
+      "parent": "backThigh",
+      "pivot": [
+        0.5,
+        0.06
+      ],
+      "z": -3
+    }
+  }
+}

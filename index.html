@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>강령전쟁</title>
+<link rel="stylesheet" href="./src/ui/style.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================ commander select ============================ -->
+  <section id="screen-select" class="screen active">
+    <div class="select-bg"></div>
+    <header class="title-block">
+      <div class="title-rule"></div>
+      <h1>강령전쟁</h1>
+      <p class="subtitle">말이 곧 병력이다 &nbsp;·&nbsp; 문장으로 군세를 불러 상대의 코어를 부순다</p>
+      <div class="title-rule"></div>
+    </header>
+    <div id="commander-grid" class="commander-grid"></div>
+    <div id="briefing" class="briefing" hidden></div>
+    <div class="diff-pick" id="diff-pick"></div>
+    <footer class="select-footer">
+      <div id="select-hint" class="hint">사령관을 고르면 반대 진영의 사령관이 배정된다</div>
+      <button id="btn-start" class="btn-primary lg" disabled>전장 진입</button>
+    </footer>
+  </section>
+
+  <!-- ============================ battle ============================ -->
+  <section id="screen-battle" class="screen">
+    <canvas id="field"></canvas>
+
+    <!-- top slab: who, what state, how long -->
+    <div class="hud-top">
+      <div class="hud-side left">
+        <img class="hud-face" id="face-p1" alt="" />
+        <div class="hud-col">
+          <div class="hud-name" id="label-p1">—</div>
+          <div class="bar core"><i id="core-p1"></i></div>
+          <div class="bar bast"><i id="bast-p1"></i></div>
+          <div class="hud-res"><span id="res-p1">0</span><em id="mech-p1"></em></div>
+        </div>
+      </div>
+
+      <div class="hud-clock">
+        <div id="clock">0:00</div>
+        <div class="wave-ring"><i id="wave-fill"></i></div>
+        <div id="phase-label">웨이브 1</div>
+      </div>
+
+      <div class="hud-side right">
+        <img class="hud-face" id="face-p2" alt="" />
+        <div class="hud-col">
+          <div class="hud-name" id="label-p2">—</div>
+          <div class="bar core rev"><i id="core-p2"></i></div>
+          <div class="bar bast rev"><i id="bast-p2"></i></div>
+          <div class="hud-res"><span id="res-p2">0</span><em id="mech-p2"></em></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="dex-panel" id="dex-panel"></aside>
+
+    <aside class="foe-quote" id="foe-quote" hidden>
+      <div class="fq-head"><span id="fq-who">—</span><span class="fq-tag" id="fq-tag"></span></div>
+      <blockquote id="fq-text"></blockquote>
+      <div class="fq-stat" id="fq-stat"></div>
+    </aside>
+
+    <!-- bottom slab: the command altar -->
+    <div class="hud-bottom" id="prompt-panel">
+      <button class="drawer-tab" id="drawer-tab">해석 · 서고 [Tab]</button>
+
+      <div class="altar-head">
+        <span class="altar-label">전황</span>
+        <div class="signal-row" id="signal-row"></div>
+        <span class="altar-label" style="margin-left:6px">추천</span>
+        <div class="suggest-row" id="suggest-row"></div>
+      </div>
+
+      <div class="cast-row">
+        <textarea id="prompt-input" rows="1" spellcheck="false"
+          placeholder="적 광역에 흩어지는 날렵한 그림자 자객 셋"></textarea>
+        <div class="tier-pick" id="tier-pick"></div>
+        <button id="btn-summon" class="btn-cast">소환<small id="cast-cost">◆120</small></button>
+      </div>
+
+      <div class="receipt" id="receipt"></div>
+
+      <div class="altar-foot">
+        <div id="card-slots" class="card-slots"></div>
+        <button id="btn-engrave" class="btn-ghost" disabled>각인</button>
+        <div id="upgrade-row" class="upgrade-row"></div>
+      </div>
+
+      <div class="drawer" id="drawer">
+        <div class="drawer-col">
+          <h4>해석 상세</h4>
+          <div class="detail" id="detail"></div>
+        </div>
+        <div class="drawer-col">
+          <h4>전투 기록</h4>
+          <div class="log" id="log"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="banner" id="banner"></div>
+    <div class="cast-flash" id="cast-flash"><div id="cast-flash-text"></div></div>
+  </section>
+
+  <!-- ============================ result ============================ -->
+  <section id="screen-result" class="screen">
+    <div class="select-bg"></div>
+    <h2 id="result-title">—</h2>
+    <div id="result-body" class="result-body"></div>
+    <button id="btn-again" class="btn-primary lg">다시 하기</button>
+  </section>
+</div>
+<script type="importmap">
+{ "imports": { "three": "./node_modules/three/build/three.module.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

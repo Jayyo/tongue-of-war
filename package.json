@@ -1,0 +1,15 @@
+{
+  "name": "tongue-of-war",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser tug-of-war strategy game where you summon units by writing Korean sentences",
+  "scripts": {
+    "start": "node server.js",
+    "balance": "node tools/balance.js",
+    "duel": "node tools/balance.js duel"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.log
+__pycache__/
+
+# Asset pipeline intermediates: generation sheets and the PNGs the slicers write.
+# Only the WebP files produced by tools/webp.py are committed.
+assets/**/raw/
+assets/**/*.png
