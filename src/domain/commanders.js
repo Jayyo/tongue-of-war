@@ -96,13 +96,13 @@ export const COMMANDERS = [
   },
   {
     id: 'alchemist', faction: 'human', name: '연금술사', epithet: '전투 연성',
-    desc: '스킬에 예산을 몰고, 이미 만든 유닛의 피해 속성을 전투 중에 바꿔 상대 저항을 무너뜨린다.',
+    desc: '스킬에 예산을 몰고, 각인해 둔 설계의 피해 속성을 전투 중에 바꿔 상대 저항을 무너뜨린다.',
     tags: ['스킬', '상태이상', '적응'],
     bias: { skill: +10, range: +2, dps: -6, hp: -6 },
     mechanic: {
       id: 'transmute',
       label: '전투 연성',
-      desc: '웨이브 잠금 전에 각인 카드 하나의 피해 속성을 물리↔비술로 전환. 비용 30, 같은 카드 2웨이브 쿨다운.',
+      desc: '각인 카드 하나의 피해 속성을 물리↔비술로 전환한다. 비용 30, 같은 카드는 2국면 뒤에 다시 바꿀 수 있다.',
       cost: 30, cooldownWaves: 2,
     },
     systemPrompt:

@@ -30,7 +30,7 @@ const state = {
   lastBlueprint: null, lastPrompt: '', lastIntent: null, lastTier: 'standard',
   cards: [], scrollHistory: [], castLog: [],
   raf: 0, acc: 0, lastNow: 0,
-  aiWave: 0, aiBusy: false, aiMode: 'unknown', diff: 'duel',
+  aiWave: 0, aiBusy: false, aiMode: 'unknown', diff: 'duel', transmuting: false,
 };
 
 // ==================================================================== select
@@ -134,7 +134,7 @@ async function startBattle() {
   });
   state.mySide = myside;
   Object.assign(state, {
-    cards: [], scrollHistory: [], castLog: [], lastBlueprint: null, lastIntent: null,
+    cards: [], scrollHistory: [], castLog: [], lastBlueprint: null, lastIntent: null, transmuting: false,
     lastTier: state.tier, aiWave: 0, aiBusy: false,
   });
 
@@ -448,13 +448,19 @@ function renderCards() {
     if (!c) { el.textContent = '빈 슬롯'; el.disabled = true; }
     else {
       const cost = Math.round(CFG.ritual.tiers[c.tier].cost * CFG.ritual.engravedCastMul);
+      const arcane = c.bp.channel === 'arcane';
       el.innerHTML = `<span class="chip role-${c.bp.role}">${roleLabel(c.bp.role)}</span>
+        <i class="card-ch${arcane ? ' arcane' : ''}"></i>
         <span class="card-name">${esc(c.prompt)}</span><span class="card-cost">◈${cost}</span>`;
-      el.title = c.prompt;
+      el.title = `${c.prompt} (${arcane ? '비술' : '물리'})`;
       el.onclick = () => {
-        if (!queueContract(state.battle, state.mySide, c.bp, cost)) return fail(`영기 ${Math.ceil(cost - player(state.battle, state.mySide).essence)} 부족 — 재소환에 ${cost} 필요`);
-        player(state.battle, state.mySide).lastSummonFx = state.battle.t;
-        logMsg(state.battle, sideKind(state.mySide), `재소환: ${c.prompt} (-${cost})`);
+        if (state.transmuting) return transmute(c);
+        const B = state.battle;
+        const me = player(B, state.mySide);
+        if (B.t < (me.lockUntil ?? 0)) return fail(`명령 잠금 — ${(me.lockUntil - B.t).toFixed(1)}초 뒤 다음 주문`);
+        if (!queueContract(B, state.mySide, c.bp, cost)) return fail(`영기 ${Math.ceil(cost - me.essence)} 부족 — 재소환에 ${cost} 필요`);
+        me.lastSummonFx = B.t;
+        logMsg(B, sideKind(state.mySide), `재소환: ${c.prompt} (-${cost})`);
       };
     }
     box.appendChild(el);
@@ -462,6 +468,40 @@ function renderCards() {
   // The engrave cost now rides on the button itself instead of a separate label.
   const engCost = Math.round(CFG.ritual.tiers[state.lastTier ?? state.tier].cost * CFG.ritual.engraveCostMul);
   $('btn-engrave').textContent = `각인 ◆${engCost} (${state.cards.length}/${CFG.ritual.engraveSlots})`;
+  const mech = player(state.battle, state.mySide).commander.mechanic;
+  const tx = $('btn-transmute');
+  tx.hidden = mech.id !== 'transmute';
+  tx.disabled = !state.cards.length;
+  tx.classList.toggle('on', state.transmuting);
+  if (!tx.hidden) tx.textContent = state.transmuting ? '연성할 카드 선택' : `연성 ◆${mech.cost}`;
+}
+
+/**
+ * The alchemist's lever: flip an engraved card between physical and arcane, so a
+ * design the enemy has started resisting comes back through the other channel.
+ * Arm the button, then click a card. Only future recasts change; units already on
+ * the field keep the channel they were summoned with.
+ */
+function toggleTransmute() {
+  state.transmuting = !state.transmuting && state.cards.length > 0;
+  renderCards();
+}
+
+function transmute(card) {
+  const B = state.battle;
+  const p = player(B, state.mySide);
+  const m = p.commander.mechanic;
+  state.transmuting = false;
+  renderCards();
+  const readyAt = (card.transmutedAt ?? -Infinity) + m.cooldownWaves;
+  if (B.wave < readyAt) return fail(`이 카드는 ${readyAt - B.wave}국면 뒤에 다시 연성할 수 있다`);
+  if (p.essence < m.cost) return fail(`영기 ${Math.ceil(m.cost - p.essence)} 부족 — 연성에 ${m.cost} 필요`);
+  p.essence -= m.cost;
+  const channel = card.bp.channel === 'arcane' ? 'physical' : 'arcane';
+  card.bp = { ...card.bp, channel };
+  card.transmutedAt = B.wave;
+  logMsg(B, sideKind(state.mySide), `전투 연성: ${card.prompt} → ${channel === 'arcane' ? '비술' : '물리'} (-${m.cost})`);
+  renderCards();
 }
 
 // ---------------------------------------------------------------- loop
@@ -704,6 +744,7 @@ buildDiffPick();
 $('btn-start').onclick = startBattle;
 $('btn-summon').onclick = summon;
 $('btn-engrave').onclick = engrave;
+$('btn-transmute').onclick = toggleTransmute;
 $('btn-again').onclick = () => { show('screen-select'); state.battle = null; };
 $('drawer-tab').onclick = toggleDrawer;
 function toggleDrawer() {
