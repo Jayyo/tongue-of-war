@@ -62,7 +62,10 @@ function synergyCost(cDps, cRange, cSpeed) {
  * @property {'elite'|'pack'|'swarm'} cohort
  * @property {'precision'|'sweep'} attackShape
  * @property {'physical'|'arcane'} damageChannel
- * @property {{hp:number,damage:number,range:number,speed:number,defense:number}} priorities 0..3
+ * @property {'compact'|'spread'} [formation]
+ * @property {'steady'|'relentless'|'flexible'} [persistence]
+ * @property {'physical'|'arcane'|null} [wardAgainst]
+ * @property {{hp:number,damage:number,range:number,speed:number,defense:number}} priorities -3..3
  * @property {1|2|3|5} requestedCount
  * @property {string[]} skills
  * @property {'nearest'|'backline'|'highestHp'|'lowestHp'} targetPreference
@@ -80,14 +83,44 @@ const ROLE_BASE = {
 const CADENCE_BY_COHORT = { elite: 'crush', pack: 'balanced', swarm: 'flurry' };
 
 /**
- * Compile a validated intent into a legal blueprint inside `bp`.
- * @param {UnitIntent} intent
+ * Coerce an intent to the closed shape: unknown enum values become the neutral
+ * choice and priorities become finite numbers in -3..3. The parser never produces
+ * anything else, but this file is the boundary, so it does not take that on trust.
+ * @param {any} it
+ * @returns {UnitIntent}
+ */
+export function normalizeIntent(it) {
+  const src = it && typeof it === 'object' ? it : {};
+  const oneOf = (v, list, fallback) => (list.includes(v) ? v : fallback);
+  const level = (v) => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, -3, 3) : 0);
+  const p = src.priorities && typeof src.priorities === 'object' ? src.priorities : {};
+  return {
+    ...src,
+    role: oneOf(src.role, ['guard', 'raider', 'artillery'], 'guard'),
+    cohort: oneOf(src.cohort, ['elite', 'pack', 'swarm'], 'pack'),
+    attackShape: oneOf(src.attackShape, ['precision', 'sweep'], 'precision'),
+    damageChannel: oneOf(src.damageChannel, ['physical', 'arcane'], 'physical'),
+    formation: oneOf(src.formation, ['compact', 'spread'], 'compact'),
+    persistence: oneOf(src.persistence, ['steady', 'relentless', 'flexible'], 'steady'),
+    wardAgainst: oneOf(src.wardAgainst, ['physical', 'arcane'], null),
+    priorities: { hp: level(p.hp), damage: level(p.damage), range: level(p.range), speed: level(p.speed), defense: level(p.defense) },
+    requestedCount: oneOf(src.requestedCount, C.limits.counts, 1),
+    skills: Array.isArray(src.skills) ? src.skills.filter((s) => typeof s === 'string') : [],
+    targetPreference: oneOf(src.targetPreference, ['nearest', 'backline', 'highestHp', 'lowestHp'], 'nearest'),
+    confidence: typeof src.confidence === 'number' && Number.isFinite(src.confidence) ? clamp(src.confidence, 0, 1) : 1,
+  };
+}
+
+/**
+ * Compile an intent into a legal blueprint inside `bp`.
+ * @param {UnitIntent} rawIntent
  * @param {number} bp
  * @param {import('./commanders.js').Commander} [commander]
  * @returns {UnitBlueprint}
  */
-export function compile(intent, bp, commander) {
-  const role = CFG.roles[intent.role] ? intent.role : 'guard';
+export function compile(rawIntent, bp, commander) {
+  const intent = normalizeIntent(rawIntent);
+  const role = intent.role;
   const roleCfg = CFG.roles[role];
 
   // ---- 1. priorities.
@@ -238,6 +271,14 @@ export function compile(intent, bp, commander) {
   const cadence = CFG.combat.cadence[CADENCE_BY_COHORT[intent.cohort] ?? 'balanced'];
 
   const spent = cHp + cDps + cDef + cRange + cSpeed + cSkill + cSplit + cForm + synergyCost(cDps, cRange, cSpeed);
+
+  // Fixed costs (an artillery range floor, two skills, a spread formation) can
+  // leave nothing to shrink on the smallest ritual. Shed the last skill, then the
+  // spread, and compile again rather than ship an over-budget unit.
+  if (spent > bp + 0.01) {
+    if (skills.length) return compile({ ...intent, skills: skills.slice(0, -1) }, bp, commander);
+    if (formation === 'spread') return compile({ ...intent, formation: 'compact' }, bp, commander);
+  }
 
   /** @type {UnitBlueprint} */
   const bpOut = {

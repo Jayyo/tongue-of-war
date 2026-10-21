@@ -6,10 +6,14 @@
   "description": "Browser tug-of-war strategy game where you summon units by writing Korean sentences",
   "scripts": {
     "start": "node server.js",
+    "test": "node --test",
     "balance": "node tools/balance.js",
     "duel": "node tools/balance.js duel"
   },
   "dependencies": {
     "three": "^0.185.1"
+  },
+  "engines": {
+    "node": ">=20.12"
   }
 }
