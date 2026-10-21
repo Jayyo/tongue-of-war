@@ -35,7 +35,7 @@ which did nothing.
 This is a narrow claim. It does not make the model behave and it does not make every
 sentence a good one. It guarantees that whatever is written becomes a legal unit within
 its budget. `npm test` fuzzes the compiler with thousands of random sentences and
-malformed intents to keep that true; it found two holes while it was being written.
+malformed intents and prices every result from its final stats to keep that true.
 
 The LLM opponent plays by the same rules. The browser sends the server a public
 battlefield snapshot, the server builds the prompt, the model writes one Korean sentence,
@@ -162,11 +162,11 @@ output, abridged:
   FORMATION_GATE=PASS
 
 === Commander matches, bot vs bot (sides alternate, 8 seeds per pairing) ===
-  lucifer vs smith           demon win rate  88%
-  abaddon vs smith           demon win rate  13%
-  baal vs alchemist          demon win rate 100%
+  lucifer vs smith           demon win rate  50%
+  lucifer vs headsman        demon win rate 100%
+  abaddon vs smith           demon win rate   0%
   ...
-  match length: p10 4:23 / median 6:29 / p90 8:48  (target median 6:30)
+  match length: p10 4:23 / median 6:35 / p90 8:41  (target median 6:30)
 ```
 
 Not everything is green; see the limitations.
@@ -184,8 +184,8 @@ share one costume and palette. The art is CC BY 4.0; see [NOTICE](NOTICE).
 - Korean input only. The parser is a dictionary matcher, not a language model; plenty of
   reasonable sentences parse poorly, which is why the receipt exists.
 - Balance is unfinished. The winner of a cohort duel keeps more of its army than the
-  target; bot-vs-bot commander pairings are lopsided (the demon side wins 50 to 100% in 7
-  of 9); guards and artillery already move at their role's speed cap, so `느린` (slow)
+  target; bot-vs-bot commander pairings are lopsided (single pairings range from 0% to
+  100% demon wins); guards and artillery already move at their role's speed cap, so `느린` (slow)
   makes only raiders slower (for the others it just shifts the HP/damage split); and in
   the duel harness veiled raiders slip past the other cohort, so their row of the matchup
   matrix is all draws.
@@ -193,9 +193,10 @@ share one costume and palette. The art is CC BY 4.0; see [NOTICE](NOTICE).
   to the role's silhouette, marked with △.
 - Single player against the AI, desktop only. No online play, replay viewer or sound.
 - The server is meant for local play. It binds to 127.0.0.1, accepts API calls only from
-  its own (unframeable) page, builds every prompt itself (the only free text it forwards is your last
-  sentence, cut to 80 characters of Korean) and rate-limits model calls. Still, if you
-  expose it with a key configured, anyone who can reach it spends your key.
+  its own page (which cannot be framed), builds every prompt itself (the only free text it
+  forwards is your last sentence, cut to 80 characters of Korean) and rate-limits model
+  calls. Still, if you expose it with a key configured, anyone who can reach it spends
+  your key.
 
 ## 한국어
 

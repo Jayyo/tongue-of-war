@@ -30,10 +30,10 @@ about the stats only: it does not make the model behave, and it does not make th
 good.
 
 `compile()` normalizes whatever it is given before pricing it, and a fuzz test
-(`test/compiler.test.mjs`) feeds it thousands of random sentences and malformed intents,
-checking every result against bounds taken from the config: total cost within budget,
-range and speed inside the role's band, HP and DPS inside their budget shares, resists at
-most 25%, finite numbers, legal skills.
+(`test/compiler.test.mjs`) feeds it thousands of random sentences and malformed intents.
+Every result is re-priced from its final stats with the formulas below and must fit its
+budget; range and speed must sit inside the role's band, HP and DPS under their share
+caps, resists at most 25%, every number finite and every skill legal for the role.
 
 ### Costs are convex and coupled
 
@@ -73,8 +73,9 @@ unchanged.
 Two layers are enough to stay readable:
 
 1. a role triangle, guard > raider > artillery > guard, at x1.1;
-2. composition: splash beats swarms, swarms waste a crushing elite's overkill, a precise
-   elite punishes a splash design's spent budget.
+2. composition: splash beats swarms, a swarm makes a slow-hitting elite waste damage on
+   overkill, and against a lone precise elite the budget a splash design spent on splash
+   buys nothing.
 
 The role, resist, execute, mark and home-defence multipliers are multiplied together and
 the product is capped at x1.4. Without the cap, range advantage, target selection, skills
@@ -107,8 +108,8 @@ new keyword list.
 
 ## 4. Tempo
 
-- Summons are immediate: the cohort appears 0.6 s after the cast, then a 4 s command
-  lock. An earlier version queued summons for the next 12 s wave edge and read as "my
+- Summons are immediate: the cohort appears 0.6 s after the cast, and the next cast is
+  locked for 4 s. An earlier version queued summons for the next 12 s wave edge and read as "my
   summon did nothing". The cheapest ritual costs 80 and income starts at about 8.3/s, so
   typing speed is not production speed anyway.
 - The 12 s wave survives as a phase counter: income steps, opponent turns, the doctrine
@@ -153,15 +154,15 @@ The prompt describes the meaning space (roles, sizes, channels, skills) rather t
 parser's dictionary, so the model writes sentences instead of keyword lists.
 
 The browser sends only a public snapshot: wave, time, the AI's own essence, front line,
-structure HP, revealed cohorts, live signals and the human's last summoned sentence. Never
-the human's essence or unsent text. The server validates the snapshot field by field and
-builds the prompt itself (`src/ai/opponent-prompt.js`); the only free text that reaches
-the model is that last sentence, cut to 80 characters of Korean. The API also refuses
-other origins and non-JSON requests and the page refuses to be framed, so another web page
-cannot quietly spend the key through the player's browser. Answers are cached per quantized situation, so a repeated situation
-reuses its sentence instead of calling the model again. Any failure (no key, timeout,
-empty answer, rate limit) falls back to the scripted bot, and the quote box says which
-one wrote the line.
+structure HP, revealed cohorts, live signals and the human's last summoned sentence.
+Never the human's essence or unsent text. The server validates the snapshot field by
+field and builds the prompt itself (`src/ai/opponent-prompt.js`); the only free text that
+reaches the model is that last sentence, cut to 80 characters of Korean. The API also
+refuses other origins and non-JSON requests and the page refuses to be framed, so another
+web page cannot quietly spend the key through the player's browser. Answers are cached
+per quantized situation, so a repeated situation reuses its sentence instead of calling
+the model again. Any failure (no key, timeout, empty answer, rate limit) falls back to
+the scripted bot, and the quote box says which one wrote the line.
 
 The model's sentence is priced exactly like the player's: context discount when it answers
 a live signal, repeat surcharge against its own history. The keyless bot is simpler: it
@@ -204,11 +205,12 @@ stays.
    sentence leads players to an unexpected but understandable tactic. If three intent
    fingerprints account for most of the essence spent, the fix is a richer intent and
    conditional-behaviour grammar, not bigger penalties.
-3. **Current balance gaps** (from `npm run balance`): the winner keeps a median 36% of its
-   value in cohort duels against a 15-30% target; bot-vs-bot commander pairings are
-   lopsided (the demon side wins 50-100% in 7 of 9); in cohort duels with structures off,
-   veiled raiders slip past the other cohort and both end up on an invulnerable core, so
-   that row of the matrix is all draws; guards and artillery sit at their speed cap, so
-   "느린" (slow) only reallocates budget for raiders.
+3. **Current balance gaps** (from `npm run balance`): the winner keeps a median 36% of
+   its value in cohort duels against a 15-30% target; bot-vs-bot commander pairings are
+   lopsided (single pairings range from 0% to 100% demon wins); in cohort duels with
+   structures off, veiled raiders slip past the other cohort and both end up on an
+   invulnerable core, so that row of the matrix is all draws; guards and artillery
+   already move at their speed cap, so "느린" (slow) only makes raiders slower and merely
+   shifts the HP/damage split for the others.
 4. **LLM dependence.** A model opponent costs money per match and its skill changes when
    the model does. The cache and the bot fallback soften this; they do not remove it.
