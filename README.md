@@ -4,6 +4,9 @@
 Korean sentences. Your opponent is an LLM writing sentences under the same rules, or a
 scripted bot if no API key is set.
 
+**Play in your browser: https://jayyo.github.io/tongue-of-war/** (desktop; the web build
+has no server, so you play the scripted bot. For the LLM opponent, run it locally.)
+
 ![A sentence becomes three tanks, then the LLM opponent answers with a sentence of its own](docs/media/demo.webp)
 
 <sub>`앞을 막아서는 두꺼운 탱크 셋` ("three thick tanks that hold the line") becomes three
@@ -74,6 +77,11 @@ OPENAI_API_KEY=sk-... npm start
 The defaults are fast models with reasoning turned down. A wave is 12 seconds; with the
 game's real prompt gpt-6-luna answered in 1.3 to 2.3 s, while larger reasoning models took
 5 to 7 s and sometimes spent their whole output budget thinking.
+
+The web build is published by [`.github/workflows/pages.yml`](.github/workflows/pages.yml).
+It copies the page, `src/`, `assets/`, the license files and the two three.js files the
+import map points at, and adds `<meta name="backend" content="none">` so the page skips the
+API and starts with the scripted bot.
 
 ## How to play
 
@@ -208,6 +216,8 @@ share one costume and palette. The art is CC BY 4.0; see [NOTICE](NOTICE).
 파서를 거쳐 수치 필드가 없는 `UnitIntent`(역할, 규모, 속성, 우선순위, 스킬)가 되고, BP
 컴파일러만 이것을 예산 안의 스탯으로 바꿉니다. "HP 999999 무적 드래곤"은 걸러지는 것이
 아니라 숫자가 들어갈 칸이 없어서 "드래곤 하나"와 똑같은 유닛이 됩니다.
+
+브라우저에서 바로 하기: https://jayyo.github.io/tongue-of-war/ (서버가 없는 웹 빌드라 내장 봇과 대전)
 
 ```bash
 npm install
