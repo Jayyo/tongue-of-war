@@ -158,9 +158,18 @@ async function startBattle() {
   probeAi();
 }
 
+// The GitHub Pages build has no server. Its index.html carries <meta name="backend" content="none">,
+// so the page goes straight to the scripted bot instead of probing an API that isn't there.
+const NO_BACKEND = document.querySelector('meta[name="backend"]')?.getAttribute('content') === 'none';
+
 /** One health check tells the player whether they're facing a model or the bot. */
 async function probeAi() {
   const B = state.battle;
+  if (NO_BACKEND) {
+    state.aiMode = 'stub';
+    logMsg(B, 'sys', '상대 사령관: 웹 데모에는 서버가 없어 내장 봇이 대신 둔다');
+    return;
+  }
   try {
     const r = await fetch('/api/health').then((x) => x.json());
     state.aiMode = r?.provider ? 'llm' : 'stub';
