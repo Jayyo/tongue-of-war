@@ -16,6 +16,12 @@ sentence, which goes through the same parser. Recorded headlessly with
 
 ## The idea
 
+I kept thinking about StarCraft custom maps like Nexus Wars, where the fun is
+answering the other side's units with counters. Designing all those units and
+upgrades was the hard part, so in July 2026 I tried letting a sentence summon the
+army instead. In the first playtests, whatever I typed, the same few units came out;
+my main note was "if I summon archers, they should shoot arrows."
+
 Letting players type what they want is the easy part. Keeping that from breaking the
 game is the hard part: if a model's output can set stats, someone will ask for an
 invincible dragon and get one. So nothing anyone writes, player or model, becomes a number
@@ -211,6 +217,10 @@ share one costume and palette. The art is CC BY 4.0; see [NOTICE](NOTICE).
 강령전쟁은 유닛을 버튼이 아니라 한국어 문장으로 소환하는 브라우저 줄다리기(tug-of-war)
 전략 게임입니다. 상대는 같은 규칙으로 문장을 쓰는 LLM이고, API 키가 없으면 내장 봇이
 대신 둡니다.
+
+스타 유즈맵 '넥서스 부수기'처럼 상대 유닛에 카운터를 치는 재미를 생각하다가, 유닛과
+업그레이드를 다 설계하는 대신 문장으로 군대를 소환해 보자는 생각으로 2026년 7월에
+시작했습니다. 첫 플레이테스트에서는 뭘 써도 같은 유닛 몇 개만 나왔습니다.
 
 핵심은 문장이 숫자를 직접 만들지 못한다는 점입니다. 플레이어와 AI의 문장은 같은 결정론
 파서를 거쳐 수치 필드가 없는 `UnitIntent`(역할, 규모, 속성, 우선순위, 스킬)가 되고, BP
